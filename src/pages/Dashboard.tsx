@@ -190,7 +190,7 @@ export default function DashboardPage() {
                   <div key={s.name} className="flex items-center gap-4">
                     <span className="w-48 text-sm text-foreground truncate">{s.name}</span>
                     <div className="flex-1 h-6 bg-background rounded-full overflow-hidden">
-                      <div className="h-full bg-muted-foreground/40 rounded-full transition-all" style={{ width: `${(s.value / maxVal) * 100}%` }} />
+                      <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(s.value / maxVal) * 100}%` }} />
                     </div>
                     <span className="text-sm font-medium text-foreground w-8 text-right">{s.value}</span>
                   </div>
