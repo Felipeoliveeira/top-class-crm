@@ -112,16 +112,8 @@ export default function LeadsPage() {
                 <td className="py-3 px-4">
                   <div className="flex items-center justify-end gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => navigate(`/leads/${lead.id}`)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => navigate(`/leads/${lead.id}`)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    {canReassignLead && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => toast.info('Reatribuição em breve')}>
-                        <ArrowLeftRight className="h-4 w-4" />
-                      </Button>
-                    )}
                     {lead.status === 'fechado' && canInactivateLead(lead.consultor_id) && (
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => toast.info('Inativação em breve')}>
                         <UserX className="h-4 w-4" />
