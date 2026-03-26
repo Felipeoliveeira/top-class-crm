@@ -166,7 +166,7 @@ export default function LeadDetailPage() {
 
       {/* Section 1 - Basic Data */}
       <Collapsible open={openSections.basico} onOpenChange={v => setOpenSections(p => ({ ...p, basico: v }))}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-card border border-border p-4">
+        <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.basico ? "rounded-t-lg" : "rounded-lg")}>
           <h3 className="font-semibold text-foreground">Dados Básicos</h3>
           <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.basico && 'rotate-180')} />
         </CollapsibleTrigger>
@@ -220,7 +220,7 @@ export default function LeadDetailPage() {
       {/* Section 2 - Negotiation */}
       {showNegociacao && (
         <Collapsible open={openSections.negociacao} onOpenChange={v => setOpenSections(p => ({ ...p, negociacao: v }))}>
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-card border border-border p-4">
+          <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.negociacao ? "rounded-t-lg" : "rounded-lg")}>
             <h3 className="font-semibold text-foreground">Negociação</h3>
             <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.negociacao && 'rotate-180')} />
           </CollapsibleTrigger>
@@ -255,7 +255,7 @@ export default function LeadDetailPage() {
       {/* Section 3 - Contract */}
       {showContratual && (
         <Collapsible open={openSections.contratual} onOpenChange={v => setOpenSections(p => ({ ...p, contratual: v }))}>
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-card border border-border p-4">
+          <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.contratual ? "rounded-t-lg" : "rounded-lg")}>
             <h3 className="font-semibold text-foreground">Dados Contratuais</h3>
             <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.contratual && 'rotate-180')} />
           </CollapsibleTrigger>
@@ -317,7 +317,7 @@ export default function LeadDetailPage() {
 
       {/* Section 4 - Documents */}
       <Collapsible open={openSections.docs} onOpenChange={v => setOpenSections(p => ({ ...p, docs: v }))}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-card border border-border p-4">
+        <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.docs ? "rounded-t-lg" : "rounded-lg")}>
           <h3 className="font-semibold text-foreground">Documentos ({documentos.length})</h3>
           <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.docs && 'rotate-180')} />
         </CollapsibleTrigger>
@@ -345,7 +345,7 @@ export default function LeadDetailPage() {
       {/* Section 5 - Financial */}
       {showNegociacao && (
         <Collapsible open={openSections.financeiro} onOpenChange={v => setOpenSections(p => ({ ...p, financeiro: v }))}>
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-card border border-border p-4">
+          <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.financeiro ? "rounded-t-lg" : "rounded-lg")}>
             <h3 className="font-semibold text-foreground">Status Financeiro</h3>
             <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.financeiro && 'rotate-180')} />
           </CollapsibleTrigger>
@@ -376,7 +376,7 @@ export default function LeadDetailPage() {
 
       {/* Section 6 - Interaction History */}
       <Collapsible open={openSections.historico} onOpenChange={v => setOpenSections(p => ({ ...p, historico: v }))}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-card border border-border p-4">
+        <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.historico ? "rounded-t-lg" : "rounded-lg")}>
           <h3 className="font-semibold text-foreground">Histórico de Interações ({historico.length})</h3>
           <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.historico && 'rotate-180')} />
         </CollapsibleTrigger>

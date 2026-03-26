@@ -1,13 +1,5 @@
-import { Bell, LogOut, Menu, User } from 'lucide-react'
+import { Menu } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { useLocation, NavLink } from 'react-router-dom'
 import { useState } from 'react'
 import { TopClassLogo } from './TopClassLogo'
@@ -22,10 +14,9 @@ const breadcrumbMap: Record<string, string> = {
 }
 
 export function AppHeader() {
-  const { user, isAdmin, logout } = useAuth()
+  const { isAdmin } = useAuth()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const initials = user?.nome_completo.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'TC'
   const currentPage = breadcrumbMap[location.pathname] || (location.pathname.startsWith('/leads/') ? 'Detalhe do Lead' : 'CRM')
 
   const adminNav = [
@@ -53,30 +44,7 @@ export function AppHeader() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">3</span>
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 rounded-full p-0">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary/20 text-primary text-xs">{initials}</AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-card border-border">
-              <DropdownMenuItem className="text-foreground focus:bg-surface-elevated">
-                <User className="mr-2 h-4 w-4" /> Perfil
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={logout} className="text-destructive focus:bg-surface-elevated">
-                <LogOut className="mr-2 h-4 w-4" /> Sair
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <div className="flex items-center gap-3" />
       </header>
 
       {/* Mobile nav drawer */}
