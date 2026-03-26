@@ -376,7 +376,7 @@ export default function LeadDetailPage() {
 
       {/* Section 6 - Interaction History */}
       <Collapsible open={openSections.historico} onOpenChange={v => setOpenSections(p => ({ ...p, historico: v }))}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-card border border-border p-4">
+        <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.historico ? "rounded-t-lg" : "rounded-lg")}>
           <h3 className="font-semibold text-foreground">Histórico de Interações ({historico.length})</h3>
           <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.historico && 'rotate-180')} />
         </CollapsibleTrigger>

@@ -1,13 +1,5 @@
-import { Bell, LogOut, Menu, User } from 'lucide-react'
+import { Menu } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { useLocation, NavLink } from 'react-router-dom'
 import { useState } from 'react'
 import { TopClassLogo } from './TopClassLogo'
