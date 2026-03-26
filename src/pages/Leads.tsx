@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 
 export default function LeadsPage() {
   const { user } = useAuth()
-  const { canViewAllLeads, canReassignLead, canExportCsv, canInactivateLead } = usePermissions()
+  const { canViewAllLeads, canExportCsv, canInactivateLead } = usePermissions()
   const navigate = useNavigate()
 
   const [search, setSearch] = useState('')
