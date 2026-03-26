@@ -132,7 +132,7 @@ export default function LeadDetailPage() {
   const removeSocio = (idx: number) => setSocios(prev => prev.filter((_, i) => i !== idx))
 
   const showNegociacao = ['negociacao', 'fechado', 'perdido', 'inativo'].includes(lead.status)
-  const showContratual = ['fechado', 'inativo'].includes(lead.status) || lead.status === 'negociacao'
+  const showContratual = ['negociacao', 'fechado', 'inativo'].includes(lead.status)
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto pb-24 md:pb-8">

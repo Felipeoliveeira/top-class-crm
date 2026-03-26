@@ -21,8 +21,8 @@ export interface Lead {
   consultor_id: string
   nome: string
   telefone: string
-  origem: LeadOrigem
-  necessidade: LeadNecessidade
+  origem: LeadOrigem | null
+  necessidade: LeadNecessidade | null
   status: LeadStatus
   servico_interesse: ServicoInteresse | null
   valor_bruto: number | null
