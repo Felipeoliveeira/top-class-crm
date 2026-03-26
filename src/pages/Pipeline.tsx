@@ -69,7 +69,7 @@ export default function PipelinePage() {
     }
     setLeads(prev => [newLead, ...prev])
     setNewLeadOpen(false)
-    setNome(''); setTelefone(''); setOrigem(''); setNecessidade(''); setConsultorId('')
+    setNome(''); setTelefone(''); setConsultorId('')
     toast.success('Lead criado com sucesso!')
   }
 
