@@ -79,11 +79,13 @@ export default function LeadDetailPage() {
     const missing: string[] = []
 
     if (lead.status === 'atendimento') {
-      // → Negociação
-      if (!lead.servico_interesse) missing.push('Serviço de Interesse')
-      if (!lead.valor_bruto) missing.push('Valor Bruto')
+      // → Negociação: requer Origem e Necessidade
+      if (!lead.origem) missing.push('Origem')
+      if (!lead.necessidade) missing.push('Necessidade Identificada')
     } else if (lead.status === 'negociacao') {
       // → Fechado
+      if (!lead.servico_interesse) missing.push('Serviço de Interesse')
+      if (!lead.valor_bruto) missing.push('Valor Bruto')
       if (!lead.email) missing.push('E-mail')
       if (!lead.rg) missing.push('RG')
       if (!lead.cpf) missing.push('CPF')
