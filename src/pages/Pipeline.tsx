@@ -50,7 +50,7 @@ export default function PipelinePage() {
   const consultores = mockPerfis.filter(p => p.role === 'consultor' && p.status === 'ativo')
   const getConsultorName = (id: string) => mockPerfis.find(p => p.id === id)?.nome_completo || 'N/A'
 
-  const canCreate = nome && telefone && origem && necessidade && (canAssignConsultor ? consultorId : true)
+  const canCreate = nome && telefone && (canAssignConsultor ? consultorId : true)
 
   const handleCreate = () => {
     // TODO: Substituir por insert Supabase — tabela: leads
@@ -58,8 +58,8 @@ export default function PipelinePage() {
       id: Date.now(),
       consultor_id: canAssignConsultor ? consultorId : (user?.id || ''),
       nome, telefone,
-      origem: origem as LeadOrigem,
-      necessidade: necessidade as LeadNecessidade,
+      origem: null,
+      necessidade: null,
       status: 'atendimento',
       servico_interesse: null, valor_bruto: null, porcentagem_desconto: null, valor_liquido: null,
       email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
