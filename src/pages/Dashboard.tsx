@@ -147,7 +147,7 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(213, 32%, 26%)" />
                 <XAxis dataKey="name" tick={{ fill: '#94A3B8', fontSize: 11 }} />
                 <YAxis tick={{ fill: '#94A3B8', fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: '#1A2438', border: '1px solid #2D3F57', borderRadius: 8, color: '#F1F5F9' }} />
+                <Tooltip contentStyle={{ background: '#1A2438', border: '1px solid #2D3F57', borderRadius: 8, color: '#F1F5F9' }} formatter={(value: number) => [<span style={{ color: '#C50B40', fontWeight: 600 }}>{value}</span>, 'Leads']} />
                 <Bar dataKey="value" name="Leads" radius={[4, 4, 0, 0]}>
                   {origemData.map((entry) => (
                     <Cell key={entry.key} fill={origemColors[entry.key]} />
