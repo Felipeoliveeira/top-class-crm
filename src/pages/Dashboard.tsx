@@ -1,12 +1,11 @@
 import { useState, useMemo } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { KpiCard } from '@/components/KpiCard'
-import { StatusBadge } from '@/components/StatusBadge'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
 import { mockLeads, mockPerfis, mockDailyData } from '@/data/mockData'
 import { LEAD_ORIGEM_LABELS, SERVICO_LABELS } from '@/types'
-import type { LeadOrigem, ServicoInteresse } from '@/types'
+import type { LeadOrigem } from '@/types'
 import { Users, TrendingUp, CheckCircle, DollarSign, XCircle, TrendingDown, Percent } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -51,18 +50,31 @@ export default function DashboardPage() {
   const valorPerdido = perdidos.reduce((sum, l) => sum + (l.valor_bruto || 0), 0)
   const totalDescontos = fechados.reduce((sum, l) => sum + ((l.valor_bruto || 0) - (l.valor_liquido || 0)), 0)
 
-  // Leads by origin
+  // TODO: Substituir por query Supabase — tabela: leads, agrupar por origem, todos os status
   const origemData = (['indicacao', 'google', 'placa', 'rede_social'] as LeadOrigem[]).map(o => ({
     name: LEAD_ORIGEM_LABELS[o],
     value: leads.filter(l => l.origem === o).length,
     key: o,
   }))
 
-  // Leads by service
+  // TODO: Substituir por query Supabase — tabela: leads, agrupar por origem, filtro status = 'fechado'
+  const clientesOrigemData = (['indicacao', 'google', 'placa', 'rede_social'] as LeadOrigem[]).map(o => ({
+    name: LEAD_ORIGEM_LABELS[o],
+    value: fechados.filter(l => l.origem === o).length,
+    key: o,
+  }))
+
+  // TODO: Substituir por query Supabase — tabela: leads, agrupar por servico_interesse, todos os status
   const servicoData = Object.entries(SERVICO_LABELS).map(([key, label]) => ({
     name: label,
     value: leads.filter(l => l.servico_interesse === key).length,
-  })).filter(d => d.value > 0).sort((a, b) => b.value - a.value)
+  })).sort((a, b) => b.value - a.value)
+
+  // TODO: Substituir por query Supabase — tabela: leads, agrupar por servico_interesse, filtro status = 'fechado'
+  const clientesServicoData = Object.entries(SERVICO_LABELS).map(([key, label]) => ({
+    name: label,
+    value: fechados.filter(l => l.servico_interesse === key).length,
+  })).sort((a, b) => b.value - a.value)
 
   // Performance by consultant
   const consultores = mockPerfis.filter(p => p.role === 'consultor' && p.status === 'ativo')
@@ -105,9 +117,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <Card className="lg:col-span-3 border-border bg-card">
+      {/* Charts Row - Line + Leads por Origem + Clientes por Origem */}
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
+        <Card className="lg:col-span-2 border-border bg-card">
           <CardHeader>
             <CardTitle className="text-foreground text-base">Leads e Ganhos por Dia</CardTitle>
           </CardHeader>
@@ -145,30 +157,71 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+
+        <Card className="lg:col-span-2 border-border bg-card">
+          <CardHeader>
+            <CardTitle className="text-foreground text-base">Clientes por Origem</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={clientesOrigemData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(213, 32%, 26%)" />
+                <XAxis dataKey="name" tick={{ fill: '#94A3B8', fontSize: 11 }} />
+                <YAxis tick={{ fill: '#94A3B8', fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: '#1A2438', border: '1px solid #2D3F57', borderRadius: 8, color: '#F1F5F9' }} />
+                <Bar dataKey="value" name="Clientes" radius={[4, 4, 0, 0]} fill="#C50B40" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Leads by service */}
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="text-foreground text-base">Leads por Plano/Serviço</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {servicoData.map(s => {
-              const maxVal = Math.max(...servicoData.map(d => d.value), 1)
-              return (
-                <div key={s.name} className="flex items-center gap-4">
-                  <span className="w-48 text-sm text-foreground truncate">{s.name}</span>
-                  <div className="flex-1 h-6 bg-background rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(s.value / maxVal) * 100}%` }} />
+      {/* Leads por Plano/Serviço + Clientes por Plano/Serviço */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle className="text-foreground text-base">Leads por Plano/Serviço</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {servicoData.map(s => {
+                const maxVal = Math.max(...servicoData.map(d => d.value), 1)
+                return (
+                  <div key={s.name} className="flex items-center gap-4">
+                    <span className="w-48 text-sm text-foreground truncate">{s.name}</span>
+                    <div className="flex-1 h-6 bg-background rounded-full overflow-hidden">
+                      <div className="h-full bg-muted-foreground/40 rounded-full transition-all" style={{ width: `${(s.value / maxVal) * 100}%` }} />
+                    </div>
+                    <span className="text-sm font-medium text-foreground w-8 text-right">{s.value}</span>
                   </div>
-                  <span className="text-sm font-medium text-foreground w-8 text-right">{s.value}</span>
-                </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle className="text-foreground text-base">Clientes por Plano/Serviço</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {clientesServicoData.map(s => {
+                const maxVal = Math.max(...clientesServicoData.map(d => d.value), 1)
+                return (
+                  <div key={s.name} className="flex items-center gap-4">
+                    <span className="w-48 text-sm text-foreground truncate">{s.name}</span>
+                    <div className="flex-1 h-6 bg-background rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(s.value / maxVal) * 100}%` }} />
+                    </div>
+                    <span className="text-sm font-medium text-foreground w-8 text-right">{s.value}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Performance table - Admin only */}
       {canViewPerformanceTable && (

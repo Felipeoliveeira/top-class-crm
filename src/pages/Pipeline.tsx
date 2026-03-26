@@ -113,7 +113,7 @@ export default function PipelinePage() {
                       <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
                     </div>
                     <div className="flex flex-wrap gap-1.5 mb-2">
-                      <StatusBadge status={lead.origem as 'ativo'} />
+                      {lead.origem && <StatusBadge status={lead.origem as 'ativo'} />}
                     </div>
                     {lead.valor_liquido && lead.valor_liquido > 0 && (
                       <p className="text-sm font-bold text-primary">R$ {lead.valor_liquido.toLocaleString('pt-BR')}</p>
