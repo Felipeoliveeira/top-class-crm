@@ -190,9 +190,9 @@ export default function LeadDetailPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-foreground">Necessidade</Label>
-              <Select value={lead.necessidade} onValueChange={v => updateField('necessidade', v as LeadNecessidade)}>
-                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue /></SelectTrigger>
+              <Label className="text-foreground">Necessidade Identificada</Label>
+              <Select value={lead.necessidade || ''} onValueChange={v => updateField('necessidade', v as LeadNecessidade)}>
+                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent className="bg-card border-border">
                   {Object.entries(LEAD_NECESSIDADE_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
                 </SelectContent>
