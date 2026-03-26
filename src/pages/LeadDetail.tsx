@@ -79,11 +79,13 @@ export default function LeadDetailPage() {
     const missing: string[] = []
 
     if (lead.status === 'atendimento') {
-      // → Negociação
-      if (!lead.servico_interesse) missing.push('Serviço de Interesse')
-      if (!lead.valor_bruto) missing.push('Valor Bruto')
+      // → Negociação: requer Origem e Necessidade
+      if (!lead.origem) missing.push('Origem')
+      if (!lead.necessidade) missing.push('Necessidade Identificada')
     } else if (lead.status === 'negociacao') {
       // → Fechado
+      if (!lead.servico_interesse) missing.push('Serviço de Interesse')
+      if (!lead.valor_bruto) missing.push('Valor Bruto')
       if (!lead.email) missing.push('E-mail')
       if (!lead.rg) missing.push('RG')
       if (!lead.cpf) missing.push('CPF')
@@ -130,7 +132,7 @@ export default function LeadDetailPage() {
   const removeSocio = (idx: number) => setSocios(prev => prev.filter((_, i) => i !== idx))
 
   const showNegociacao = ['negociacao', 'fechado', 'perdido', 'inativo'].includes(lead.status)
-  const showContratual = ['fechado', 'inativo'].includes(lead.status) || lead.status === 'negociacao'
+  const showContratual = ['negociacao', 'fechado', 'inativo'].includes(lead.status)
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto pb-24 md:pb-8">
@@ -180,17 +182,17 @@ export default function LeadDetailPage() {
             </div>
             <div className="space-y-2">
               <Label className="text-foreground">Origem</Label>
-              <Select value={lead.origem} onValueChange={v => updateField('origem', v as LeadOrigem)}>
-                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue /></SelectTrigger>
+              <Select value={lead.origem || ''} onValueChange={v => updateField('origem', v as LeadOrigem)}>
+                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent className="bg-card border-border">
                   {Object.entries(LEAD_ORIGEM_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-foreground">Necessidade</Label>
-              <Select value={lead.necessidade} onValueChange={v => updateField('necessidade', v as LeadNecessidade)}>
-                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue /></SelectTrigger>
+              <Label className="text-foreground">Necessidade Identificada</Label>
+              <Select value={lead.necessidade || ''} onValueChange={v => updateField('necessidade', v as LeadNecessidade)}>
+                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent className="bg-card border-border">
                   {Object.entries(LEAD_NECESSIDADE_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
                 </SelectContent>

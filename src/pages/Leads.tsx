@@ -104,8 +104,8 @@ export default function LeadsPage() {
               <tr key={lead.id} className="border-t border-border hover:bg-card/80 transition-colors">
                 <td className="py-3 px-4 text-sm font-medium text-foreground">{lead.nome}</td>
                 <td className="py-3 px-4 text-sm text-muted-foreground">{lead.telefone}</td>
-                <td className="py-3 px-4"><StatusBadge status={lead.origem as 'ativo'} /></td>
-                <td className="py-3 px-4 text-sm text-muted-foreground">{lead.necessidade.replace(/_/g, ' ')}</td>
+                <td className="py-3 px-4">{lead.origem ? <StatusBadge status={lead.origem as 'ativo'} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
+                <td className="py-3 px-4 text-sm text-muted-foreground">{lead.necessidade ? lead.necessidade.replace(/_/g, ' ') : '—'}</td>
                 <td className="py-3 px-4 text-sm text-muted-foreground">{getConsultor(lead.consultor_id)}</td>
                 <td className="py-3 px-4 text-sm text-muted-foreground">{new Date(lead.created_at).toLocaleDateString('pt-BR')}</td>
                 <td className="py-3 px-4"><StatusBadge status={lead.status} /></td>
@@ -143,7 +143,7 @@ export default function LeadsPage() {
               <p className="font-medium text-foreground">{lead.nome}</p>
               <StatusBadge status={lead.status} />
             </div>
-            <p className="text-xs text-muted-foreground">{LEAD_ORIGEM_LABELS[lead.origem]} • {new Date(lead.created_at).toLocaleDateString('pt-BR')}</p>
+            <p className="text-xs text-muted-foreground">{lead.origem ? LEAD_ORIGEM_LABELS[lead.origem] : 'Sem origem'} • {new Date(lead.created_at).toLocaleDateString('pt-BR')}</p>
           </div>
         ))}
       </div>

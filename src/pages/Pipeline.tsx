@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
 import { mockLeads, mockPerfis } from '@/data/mockData'
-import { LEAD_STATUS_LABELS, LEAD_ORIGEM_LABELS, LEAD_NECESSIDADE_LABELS, type Lead, type LeadStatus, type LeadOrigem, type LeadNecessidade } from '@/types'
+import { LEAD_STATUS_LABELS, type Lead, type LeadStatus } from '@/types'
 import { Plus, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -40,8 +40,6 @@ export default function PipelinePage() {
   // New lead form
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
-  const [origem, setOrigem] = useState<LeadOrigem | ''>('')
-  const [necessidade, setNecessidade] = useState<LeadNecessidade | ''>('')
   const [consultorId, setConsultorId] = useState('')
 
   const filteredLeads = useMemo(() => {
@@ -52,7 +50,7 @@ export default function PipelinePage() {
   const consultores = mockPerfis.filter(p => p.role === 'consultor' && p.status === 'ativo')
   const getConsultorName = (id: string) => mockPerfis.find(p => p.id === id)?.nome_completo || 'N/A'
 
-  const canCreate = nome && telefone && origem && necessidade && (canAssignConsultor ? consultorId : true)
+  const canCreate = nome && telefone && (canAssignConsultor ? consultorId : true)
 
   const handleCreate = () => {
     // TODO: Substituir por insert Supabase — tabela: leads
@@ -60,8 +58,8 @@ export default function PipelinePage() {
       id: Date.now(),
       consultor_id: canAssignConsultor ? consultorId : (user?.id || ''),
       nome, telefone,
-      origem: origem as LeadOrigem,
-      necessidade: necessidade as LeadNecessidade,
+      origem: null,
+      necessidade: null,
       status: 'atendimento',
       servico_interesse: null, valor_bruto: null, porcentagem_desconto: null, valor_liquido: null,
       email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
@@ -71,7 +69,7 @@ export default function PipelinePage() {
     }
     setLeads(prev => [newLead, ...prev])
     setNewLeadOpen(false)
-    setNome(''); setTelefone(''); setOrigem(''); setNecessidade(''); setConsultorId('')
+    setNome(''); setTelefone(''); setConsultorId('')
     toast.success('Lead criado com sucesso!')
   }
 
@@ -115,7 +113,7 @@ export default function PipelinePage() {
                       <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
                     </div>
                     <div className="flex flex-wrap gap-1.5 mb-2">
-                      <StatusBadge status={lead.origem as 'ativo'} />
+                      {lead.origem && <StatusBadge status={lead.origem as 'ativo'} />}
                     </div>
                     {lead.valor_liquido && lead.valor_liquido > 0 && (
                       <p className="text-sm font-bold text-primary">R$ {lead.valor_liquido.toLocaleString('pt-BR')}</p>
@@ -196,24 +194,6 @@ export default function PipelinePage() {
             <div className="space-y-2">
               <Label className="text-foreground">Telefone *</Label>
               <Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" className="bg-background border-border" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-foreground">Origem *</Label>
-              <Select value={origem} onValueChange={v => setOrigem(v as LeadOrigem)}>
-                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {Object.entries(LEAD_ORIGEM_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-foreground">Necessidade *</Label>
-              <Select value={necessidade} onValueChange={v => setNecessidade(v as LeadNecessidade)}>
-                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {Object.entries(LEAD_NECESSIDADE_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
             </div>
             {canAssignConsultor && (
               <div className="space-y-2">
