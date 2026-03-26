@@ -9,12 +9,12 @@ import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
 import { mockLeads, mockPerfis } from '@/data/mockData'
 import { LEAD_STATUS_LABELS, LEAD_ORIGEM_LABELS, type LeadStatus, type LeadOrigem } from '@/types'
-import { Eye, Pencil, ArrowLeftRight, UserX, Download, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Pencil, UserX, Download, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function LeadsPage() {
   const { user } = useAuth()
-  const { canViewAllLeads, canReassignLead, canExportCsv, canInactivateLead } = usePermissions()
+  const { canViewAllLeads, canExportCsv, canInactivateLead } = usePermissions()
   const navigate = useNavigate()
 
   const [search, setSearch] = useState('')
@@ -112,16 +112,8 @@ export default function LeadsPage() {
                 <td className="py-3 px-4">
                   <div className="flex items-center justify-end gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => navigate(`/leads/${lead.id}`)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => navigate(`/leads/${lead.id}`)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    {canReassignLead && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => toast.info('Reatribuição em breve')}>
-                        <ArrowLeftRight className="h-4 w-4" />
-                      </Button>
-                    )}
                     {lead.status === 'fechado' && canInactivateLead(lead.consultor_id) && (
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => toast.info('Inativação em breve')}>
                         <UserX className="h-4 w-4" />
