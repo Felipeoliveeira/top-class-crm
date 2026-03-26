@@ -345,7 +345,7 @@ export default function LeadDetailPage() {
       {/* Section 5 - Financial */}
       {showNegociacao && (
         <Collapsible open={openSections.financeiro} onOpenChange={v => setOpenSections(p => ({ ...p, financeiro: v }))}>
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-card border border-border p-4">
+          <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.financeiro ? "rounded-t-lg" : "rounded-lg")}>
             <h3 className="font-semibold text-foreground">Status Financeiro</h3>
             <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.financeiro && 'rotate-180')} />
           </CollapsibleTrigger>
