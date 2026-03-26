@@ -20,12 +20,12 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 }
 
 interface StatusBadgeProps {
-  status: BadgeStatus
+  status: string
   className?: string
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const config = statusConfig[status]
+  const config = statusConfig[status] || { label: status, className: 'bg-muted text-muted-foreground border-border' }
   return (
     <Badge variant="outline" className={cn('text-xs font-medium', config.className, className)}>
       {config.label}
