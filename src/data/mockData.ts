@@ -1,0 +1,231 @@
+import type { Perfil, Lead, HistoricoInteracao, DocumentoLead } from '@/types'
+
+// TODO: Substituir por query Supabase — tabela: perfis
+export const mockPerfis: Perfil[] = [
+  {
+    id: 'usr-admin-001',
+    nome_completo: 'Rodrigo Almeida',
+    email: 'rodrigo@topclass.com.br',
+    role: 'admin',
+    status: 'ativo',
+    ultimo_acesso: '2026-03-26T08:30:00Z',
+    created_at: '2025-01-10T10:00:00Z',
+  },
+  {
+    id: 'usr-consul-001',
+    nome_completo: 'Ana Paula Silva',
+    email: 'ana.paula@topclass.com.br',
+    role: 'consultor',
+    status: 'ativo',
+    ultimo_acesso: '2026-03-25T17:45:00Z',
+    created_at: '2025-02-15T09:00:00Z',
+  },
+  {
+    id: 'usr-consul-002',
+    nome_completo: 'Carlos Mendes',
+    email: 'carlos.mendes@topclass.com.br',
+    role: 'consultor',
+    status: 'ativo',
+    ultimo_acesso: '2026-03-26T09:10:00Z',
+    created_at: '2025-03-01T08:30:00Z',
+  },
+  {
+    id: 'usr-consul-003',
+    nome_completo: 'Fernanda Costa',
+    email: 'fernanda@topclass.com.br',
+    role: 'consultor',
+    status: 'inativo',
+    ultimo_acesso: '2026-01-15T14:00:00Z',
+    created_at: '2025-04-20T11:00:00Z',
+  },
+]
+
+// TODO: Substituir por query Supabase — tabela: leads, RLS por consultor_id
+export const mockLeads: Lead[] = [
+  {
+    id: 1, consultor_id: 'usr-consul-001', nome: 'Mariana Ferreira', telefone: '(11) 98765-4321',
+    origem: 'indicacao', necessidade: 'escritorio_virtual', status: 'atendimento',
+    servico_interesse: null, valor_bruto: null, porcentagem_desconto: null, valor_liquido: null,
+    email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
+    socios: null, status_financeiro: null, data_prevista_pagamento: null,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-03-20T10:00:00Z', updated_at: '2026-03-20T10:00:00Z', ultima_movimentacao_at: null,
+  },
+  {
+    id: 2, consultor_id: 'usr-consul-001', nome: 'Tech Solutions Ltda', telefone: '(11) 91234-5678',
+    origem: 'google', necessidade: 'salas', status: 'negociacao',
+    servico_interesse: 'sala_reuniao_8', valor_bruto: 4500, porcentagem_desconto: 10, valor_liquido: 4050,
+    email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
+    socios: null, status_financeiro: 'pendente', data_prevista_pagamento: 15,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-03-15T14:00:00Z', updated_at: '2026-03-22T09:00:00Z', ultima_movimentacao_at: '2026-03-22T09:00:00Z',
+  },
+  {
+    id: 3, consultor_id: 'usr-consul-002', nome: 'Roberto Nascimento', telefone: '(21) 99876-5432',
+    origem: 'placa', necessidade: 'endereco_fiscal', status: 'negociacao',
+    servico_interesse: 'plano_pro', valor_bruto: 2500, porcentagem_desconto: null, valor_liquido: 2500,
+    email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
+    socios: null, status_financeiro: 'pago', data_prevista_pagamento: 5,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-03-10T11:00:00Z', updated_at: '2026-03-18T16:00:00Z', ultima_movimentacao_at: '2026-03-18T16:00:00Z',
+  },
+  {
+    id: 4, consultor_id: 'usr-consul-001', nome: 'Juliana Ramos', telefone: '(11) 97654-3210',
+    origem: 'rede_social', necessidade: 'coworking', status: 'fechado',
+    servico_interesse: 'coworking', valor_bruto: 1800, porcentagem_desconto: 5, valor_liquido: 1710,
+    email: 'juliana@email.com', rg: '12.345.678-9', cpf: '123.456.789-00', cnpj: null, razao_social: null,
+    contato_numero: '(11) 3333-4444', socios: null, status_financeiro: 'pago', data_prevista_pagamento: 10,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-03-01T09:00:00Z', updated_at: '2026-03-12T14:00:00Z', ultima_movimentacao_at: '2026-03-12T14:00:00Z',
+  },
+  {
+    id: 5, consultor_id: 'usr-consul-002', nome: 'Empresa Alpha EIRELI', telefone: '(21) 98765-1234',
+    origem: 'indicacao', necessidade: 'escritorio_virtual', status: 'fechado',
+    servico_interesse: 'plano_premium', valor_bruto: 5200, porcentagem_desconto: 15, valor_liquido: 4420,
+    email: 'contato@alpha.com.br', rg: '98.765.432-1', cpf: '987.654.321-00',
+    cnpj: '12.345.678/0001-90', razao_social: 'Alpha Consultoria EIRELI',
+    contato_numero: '(21) 2222-3333', socios: [{ nome: 'Pedro Alpha', contato: '(21) 91111-2222' }],
+    status_financeiro: 'pago', data_prevista_pagamento: 1,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-02-20T08:00:00Z', updated_at: '2026-03-05T10:00:00Z', ultima_movimentacao_at: '2026-03-05T10:00:00Z',
+  },
+  {
+    id: 6, consultor_id: 'usr-consul-001', nome: 'Fernando Oliveira', telefone: '(11) 96543-2109',
+    origem: 'google', necessidade: 'salas', status: 'perdido',
+    servico_interesse: 'sala_special_room', valor_bruto: 3800, porcentagem_desconto: null, valor_liquido: 3800,
+    email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
+    socios: null, status_financeiro: null, data_prevista_pagamento: null,
+    motivo_perda_tipo: 'preco', motivo_perda_descricao: null,
+    created_at: '2026-03-05T13:00:00Z', updated_at: '2026-03-15T11:00:00Z', ultima_movimentacao_at: '2026-03-15T11:00:00Z',
+  },
+  {
+    id: 7, consultor_id: 'usr-consul-002', nome: 'Camila Duarte', telefone: '(21) 97777-8888',
+    origem: 'rede_social', necessidade: 'escritorio_virtual', status: 'atendimento',
+    servico_interesse: null, valor_bruto: null, porcentagem_desconto: null, valor_liquido: null,
+    email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
+    socios: null, status_financeiro: null, data_prevista_pagamento: null,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-03-22T16:00:00Z', updated_at: '2026-03-22T16:00:00Z', ultima_movimentacao_at: null,
+  },
+  {
+    id: 8, consultor_id: 'usr-consul-001', nome: 'Digital Works ME', telefone: '(11) 95555-6666',
+    origem: 'indicacao', necessidade: 'salas', status: 'negociacao',
+    servico_interesse: 'salas_fixas', valor_bruto: 7200, porcentagem_desconto: 8, valor_liquido: 6624,
+    email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
+    socios: null, status_financeiro: 'pago', data_prevista_pagamento: 20,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-03-12T10:00:00Z', updated_at: '2026-03-20T15:00:00Z', ultima_movimentacao_at: '2026-03-20T15:00:00Z',
+  },
+  {
+    id: 9, consultor_id: 'usr-consul-002', nome: 'Luciana Martins', telefone: '(21) 94444-3333',
+    origem: 'placa', necessidade: 'coworking', status: 'perdido',
+    servico_interesse: 'coworking', valor_bruto: 1200, porcentagem_desconto: null, valor_liquido: 1200,
+    email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
+    socios: null, status_financeiro: null, data_prevista_pagamento: null,
+    motivo_perda_tipo: 'concorrencia', motivo_perda_descricao: null,
+    created_at: '2026-03-08T09:00:00Z', updated_at: '2026-03-14T12:00:00Z', ultima_movimentacao_at: '2026-03-14T12:00:00Z',
+  },
+  {
+    id: 10, consultor_id: 'usr-consul-001', nome: 'André Souza', telefone: '(11) 93333-2222',
+    origem: 'google', necessidade: 'endereco_fiscal', status: 'atendimento',
+    servico_interesse: null, valor_bruto: null, porcentagem_desconto: null, valor_liquido: null,
+    email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
+    socios: null, status_financeiro: null, data_prevista_pagamento: null,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-03-24T14:00:00Z', updated_at: '2026-03-24T14:00:00Z', ultima_movimentacao_at: null,
+  },
+  {
+    id: 11, consultor_id: 'usr-consul-002', nome: 'Patrícia Lima', telefone: '(21) 92222-1111',
+    origem: 'indicacao', necessidade: 'escritorio_virtual', status: 'fechado',
+    servico_interesse: 'plano_top', valor_bruto: 8900, porcentagem_desconto: 12, valor_liquido: 7832,
+    email: 'patricia@lima.com', rg: '11.222.333-4', cpf: '111.222.333-44',
+    cnpj: '98.765.432/0001-10', razao_social: 'PL Assessoria Ltda',
+    contato_numero: '(21) 2345-6789',
+    socios: [{ nome: 'Marcos Lima', contato: '(21) 98888-7777' }, { nome: 'Sandra Lima', contato: '(21) 97777-6666' }],
+    status_financeiro: 'pago', data_prevista_pagamento: 5,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-02-10T08:00:00Z', updated_at: '2026-02-28T16:00:00Z', ultima_movimentacao_at: '2026-02-28T16:00:00Z',
+  },
+  {
+    id: 12, consultor_id: 'usr-consul-001', nome: 'Bruno Teixeira', telefone: '(11) 91111-0000',
+    origem: 'rede_social', necessidade: 'salas', status: 'atendimento',
+    servico_interesse: null, valor_bruto: null, porcentagem_desconto: null, valor_liquido: null,
+    email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
+    socios: null, status_financeiro: null, data_prevista_pagamento: null,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-03-25T11:00:00Z', updated_at: '2026-03-25T11:00:00Z', ultima_movimentacao_at: null,
+  },
+  {
+    id: 13, consultor_id: 'usr-consul-002', nome: 'Renata Vieira', telefone: '(21) 90000-9999',
+    origem: 'google', necessidade: 'escritorio_virtual', status: 'negociacao',
+    servico_interesse: 'plano_pro', valor_bruto: 2500, porcentagem_desconto: 5, valor_liquido: 2375,
+    email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
+    socios: null, status_financeiro: 'pendente', data_prevista_pagamento: 10,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-03-18T15:00:00Z', updated_at: '2026-03-23T10:00:00Z', ultima_movimentacao_at: '2026-03-23T10:00:00Z',
+  },
+  {
+    id: 14, consultor_id: 'usr-consul-001', nome: 'Gustavo Henrique', telefone: '(11) 98888-7777',
+    origem: 'placa', necessidade: 'coworking', status: 'perdido',
+    servico_interesse: 'coworking', valor_bruto: 1500, porcentagem_desconto: null, valor_liquido: 1500,
+    email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
+    socios: null, status_financeiro: null, data_prevista_pagamento: null,
+    motivo_perda_tipo: 'parou_responder', motivo_perda_descricao: null,
+    created_at: '2026-03-03T10:00:00Z', updated_at: '2026-03-10T08:00:00Z', ultima_movimentacao_at: '2026-03-10T08:00:00Z',
+  },
+  {
+    id: 15, consultor_id: 'usr-consul-002', nome: 'Isabela Correia', telefone: '(21) 97654-3210',
+    origem: 'indicacao', necessidade: 'salas', status: 'fechado',
+    servico_interesse: 'mini_sala_reuniao', valor_bruto: 3200, porcentagem_desconto: null, valor_liquido: 3200,
+    email: 'isabela@correia.com', rg: '55.666.777-8', cpf: '556.667.778-90', cnpj: null, razao_social: null,
+    contato_numero: '(21) 3456-7890', socios: null, status_financeiro: 'pago', data_prevista_pagamento: 15,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-02-25T09:00:00Z', updated_at: '2026-03-08T14:00:00Z', ultima_movimentacao_at: '2026-03-08T14:00:00Z',
+  },
+  {
+    id: 16, consultor_id: 'usr-consul-001', nome: 'Rafael Campos', telefone: '(11) 96666-5555',
+    origem: 'google', necessidade: 'escritorio_virtual', status: 'negociacao',
+    servico_interesse: 'plano_premium', valor_bruto: 5200, porcentagem_desconto: 20, valor_liquido: 4160,
+    email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
+    socios: null, status_financeiro: 'pago', data_prevista_pagamento: 25,
+    motivo_perda_tipo: null, motivo_perda_descricao: null,
+    created_at: '2026-03-16T13:00:00Z', updated_at: '2026-03-21T11:00:00Z', ultima_movimentacao_at: '2026-03-21T11:00:00Z',
+  },
+]
+
+// TODO: Substituir por query Supabase — tabela: historico_interacoes
+export const mockHistorico: HistoricoInteracao[] = [
+  { id: 1, lead_id: 1, autor_id: 'usr-consul-001', anotacao: 'Primeiro contato via WhatsApp. Cliente interessada em escritório virtual.', created_at: '2026-03-20T10:30:00Z' },
+  { id: 2, lead_id: 1, autor_id: 'usr-consul-001', anotacao: 'Agendada visita para conhecer o espaço na quinta-feira.', created_at: '2026-03-21T14:00:00Z' },
+  { id: 3, lead_id: 2, autor_id: 'usr-consul-001', anotacao: 'Cliente solicitou proposta para sala de reunião 8 pessoas.', created_at: '2026-03-16T09:00:00Z' },
+  { id: 4, lead_id: 2, autor_id: 'usr-consul-001', anotacao: 'Enviada proposta com 10% de desconto. Aguardando retorno.', created_at: '2026-03-18T11:00:00Z' },
+  { id: 5, lead_id: 2, autor_id: 'usr-admin-001', anotacao: 'Admin: Verificar se pagamento foi realizado esta semana.', created_at: '2026-03-22T09:00:00Z' },
+  { id: 6, lead_id: 4, autor_id: 'usr-consul-001', anotacao: 'Contrato assinado. Cliente inicia uso do coworking em abril.', created_at: '2026-03-12T14:00:00Z' },
+  { id: 7, lead_id: 5, autor_id: 'usr-consul-002', anotacao: 'Empresa Alpha fechou plano Premium com 2 sócios.', created_at: '2026-03-05T10:00:00Z' },
+  { id: 8, lead_id: 6, autor_id: 'usr-consul-001', anotacao: 'Cliente achou o preço alto. Marcado como perdido.', created_at: '2026-03-15T11:00:00Z' },
+  { id: 9, lead_id: 3, autor_id: 'usr-consul-002', anotacao: 'Roberto confirmou interesse no Plano Pro. Pagamento realizado.', created_at: '2026-03-18T16:00:00Z' },
+  { id: 10, lead_id: 11, autor_id: 'usr-consul-002', anotacao: 'PL Assessoria assinou contrato Plano Top. 2 sócios cadastrados.', created_at: '2026-02-28T16:00:00Z' },
+  { id: 11, lead_id: 13, autor_id: 'usr-consul-002', anotacao: 'Renata solicitou desconto. Em negociação.', created_at: '2026-03-23T10:00:00Z' },
+  { id: 12, lead_id: 8, autor_id: 'usr-consul-001', anotacao: 'Digital Works interessada em salas fixas. Proposta enviada.', created_at: '2026-03-20T15:00:00Z' },
+]
+
+// TODO: Substituir por query Supabase — tabela: documentos_lead, Storage
+export const mockDocumentos: DocumentoLead[] = [
+  { id: 1, lead_id: 4, uploaded_by: 'usr-consul-001', nome_descricao: 'Comprovante de residência', arquivo_url: '#', formato: 'pdf', tamanho_bytes: 524288, created_at: '2026-03-11T10:00:00Z' },
+  { id: 2, lead_id: 4, uploaded_by: 'usr-consul-001', nome_descricao: 'RG Juliana', arquivo_url: '#', formato: 'jpg', tamanho_bytes: 1048576, created_at: '2026-03-11T10:05:00Z' },
+  { id: 3, lead_id: 5, uploaded_by: 'usr-consul-002', nome_descricao: 'Contrato Social', arquivo_url: '#', formato: 'pdf', tamanho_bytes: 2097152, created_at: '2026-03-04T14:00:00Z' },
+  { id: 4, lead_id: 5, uploaded_by: 'usr-consul-002', nome_descricao: 'Comprovante de residência sócio', arquivo_url: '#', formato: 'pdf', tamanho_bytes: 450000, created_at: '2026-03-04T14:10:00Z' },
+  { id: 5, lead_id: 11, uploaded_by: 'usr-consul-002', nome_descricao: 'Contrato assinado', arquivo_url: '#', formato: 'doc', tamanho_bytes: 350000, created_at: '2026-02-27T16:00:00Z' },
+  { id: 6, lead_id: 15, uploaded_by: 'usr-consul-002', nome_descricao: 'Comprovante de residência', arquivo_url: '#', formato: 'pdf', tamanho_bytes: 480000, created_at: '2026-03-07T11:00:00Z' },
+]
+
+// Dashboard chart data
+export const mockDailyData = Array.from({ length: 30 }, (_, i) => {
+  const date = new Date('2026-02-25')
+  date.setDate(date.getDate() + i)
+  return {
+    date: date.toISOString().split('T')[0],
+    leads: Math.floor(Math.random() * 4),
+    ganhos: Math.floor(Math.random() * 2),
+  }
+})
