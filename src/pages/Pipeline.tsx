@@ -352,7 +352,7 @@ export default function PipelinePage() {
             {statusColumns.map(({ status, color }) => {
               const columnLeads = filteredLeads.filter(l => l.status === status)
               return (
-                <div key={status} className="w-80 shrink-0">
+                <div key={status} className="flex-1 min-w-[280px]">
                   <div className="flex items-center justify-between mb-3 px-1">
                     <h3 className={cn('text-sm font-bold uppercase tracking-wider', headerColors[status])}>
                       {LEAD_STATUS_LABELS[status]}
