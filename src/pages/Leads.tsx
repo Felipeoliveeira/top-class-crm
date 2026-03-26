@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
 import { mockLeads, mockPerfis } from '@/data/mockData'
 import { LEAD_STATUS_LABELS, LEAD_ORIGEM_LABELS, type LeadStatus, type LeadOrigem } from '@/types'
-import { Eye, Pencil, ArrowLeftRight, UserX, Download, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Pencil, UserX, Download, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function LeadsPage() {
