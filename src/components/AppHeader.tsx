@@ -14,10 +14,9 @@ const breadcrumbMap: Record<string, string> = {
 }
 
 export function AppHeader() {
-  const { user, isAdmin, logout } = useAuth()
+  const { isAdmin } = useAuth()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const initials = user?.nome_completo.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'TC'
   const currentPage = breadcrumbMap[location.pathname] || (location.pathname.startsWith('/leads/') ? 'Detalhe do Lead' : 'CRM')
 
   const adminNav = [
