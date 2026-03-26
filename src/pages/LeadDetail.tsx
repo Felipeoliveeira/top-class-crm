@@ -220,7 +220,7 @@ export default function LeadDetailPage() {
       {/* Section 2 - Negotiation */}
       {showNegociacao && (
         <Collapsible open={openSections.negociacao} onOpenChange={v => setOpenSections(p => ({ ...p, negociacao: v }))}>
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-card border border-border p-4">
+          <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.negociacao ? "rounded-t-lg" : "rounded-lg")}>
             <h3 className="font-semibold text-foreground">Negociação</h3>
             <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.negociacao && 'rotate-180')} />
           </CollapsibleTrigger>
