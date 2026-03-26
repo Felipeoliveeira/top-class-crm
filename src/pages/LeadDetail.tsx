@@ -317,7 +317,7 @@ export default function LeadDetailPage() {
 
       {/* Section 4 - Documents */}
       <Collapsible open={openSections.docs} onOpenChange={v => setOpenSections(p => ({ ...p, docs: v }))}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-card border border-border p-4">
+        <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.docs ? "rounded-t-lg" : "rounded-lg")}>
           <h3 className="font-semibold text-foreground">Documentos ({documentos.length})</h3>
           <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.docs && 'rotate-180')} />
         </CollapsibleTrigger>
