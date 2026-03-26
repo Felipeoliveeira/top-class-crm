@@ -195,24 +195,6 @@ export default function PipelinePage() {
               <Label className="text-foreground">Telefone *</Label>
               <Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" className="bg-background border-border" />
             </div>
-            <div className="space-y-2">
-              <Label className="text-foreground">Origem *</Label>
-              <Select value={origem} onValueChange={v => setOrigem(v as LeadOrigem)}>
-                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {Object.entries(LEAD_ORIGEM_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-foreground">Necessidade *</Label>
-              <Select value={necessidade} onValueChange={v => setNecessidade(v as LeadNecessidade)}>
-                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {Object.entries(LEAD_NECESSIDADE_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
             {canAssignConsultor && (
               <div className="space-y-2">
                 <Label className="text-foreground">Consultor Responsável *</Label>
