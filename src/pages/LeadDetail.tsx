@@ -255,7 +255,7 @@ export default function LeadDetailPage() {
       {/* Section 3 - Contract */}
       {showContratual && (
         <Collapsible open={openSections.contratual} onOpenChange={v => setOpenSections(p => ({ ...p, contratual: v }))}>
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg bg-card border border-border p-4">
+          <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.contratual ? "rounded-t-lg" : "rounded-lg")}>
             <h3 className="font-semibold text-foreground">Dados Contratuais</h3>
             <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.contratual && 'rotate-180')} />
           </CollapsibleTrigger>
