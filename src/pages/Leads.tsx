@@ -143,7 +143,7 @@ export default function LeadsPage() {
               <p className="font-medium text-foreground">{lead.nome}</p>
               <StatusBadge status={lead.status} />
             </div>
-            <p className="text-xs text-muted-foreground">{LEAD_ORIGEM_LABELS[lead.origem]} • {new Date(lead.created_at).toLocaleDateString('pt-BR')}</p>
+            <p className="text-xs text-muted-foreground">{lead.origem ? LEAD_ORIGEM_LABELS[lead.origem] : 'Sem origem'} • {new Date(lead.created_at).toLocaleDateString('pt-BR')}</p>
           </div>
         ))}
       </div>
