@@ -40,8 +40,6 @@ export default function PipelinePage() {
   // New lead form
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
-  const [origem, setOrigem] = useState<LeadOrigem | ''>('')
-  const [necessidade, setNecessidade] = useState<LeadNecessidade | ''>('')
   const [consultorId, setConsultorId] = useState('')
 
   const filteredLeads = useMemo(() => {
