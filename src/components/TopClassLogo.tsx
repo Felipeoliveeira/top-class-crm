@@ -15,12 +15,12 @@ function LogoIcon({ size }: { size: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="32" cy="32" r="32" fill="#111E2E" />
-      {/* Letter t - vertical stem */}
-      <path d="M30 14 L30 44 Q30 50 36 50 L38 50 L38 44 L36 44 Q34 44 34 42 L34 14 Z" fill="#C50B40" />
+      {/* Letter t - vertical stem with curved bottom tail */}
+      <path d="M29 12 L29 42 Q29 50 37 50 L40 50 L40 45 L37 45 Q34 45 34 42 L34 12 Z" fill="#C50B40" />
       {/* Letter t - horizontal crossbar */}
-      <rect x="22" y="24" width="20" height="6" rx="1" fill="#C50B40" />
-      {/* White square accent at top-left junction */}
-      <rect x="24" y="18" width="6" height="6" fill="#FFFFFF" />
+      <rect x="19" y="24" width="22" height="6" fill="#C50B40" />
+      {/* White square accent at top-left of crossbar junction */}
+      <rect x="22" y="18" width="7" height="6" fill="#FFFFFF" />
     </svg>
   )
 }
