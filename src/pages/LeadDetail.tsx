@@ -182,8 +182,8 @@ export default function LeadDetailPage() {
             </div>
             <div className="space-y-2">
               <Label className="text-foreground">Origem</Label>
-              <Select value={lead.origem} onValueChange={v => updateField('origem', v as LeadOrigem)}>
-                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue /></SelectTrigger>
+              <Select value={lead.origem || ''} onValueChange={v => updateField('origem', v as LeadOrigem)}>
+                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent className="bg-card border-border">
                   {Object.entries(LEAD_ORIGEM_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
                 </SelectContent>
