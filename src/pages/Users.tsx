@@ -44,12 +44,44 @@ export default function UsersPage() {
   }
 
   const handleInvite = async () => {
+    if (!nome.trim() || !email.trim()) return
     setSaving(true)
-    // Use Supabase Auth admin invite (requires service role — for now show info)
-    toast.info('Para convidar usuários, use o painel do Supabase Auth ou configure uma Edge Function de convite.')
-    setSaving(false)
-    setInviteOpen(false)
-    setNome(''); setEmail(''); setRole('consultor')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Sessão expirada. Faça login novamente.')
+        return
+      }
+
+      const response = await supabase.functions.invoke('invite-user', {
+        body: { email: email.trim(), nome_completo: nome.trim(), role },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+
+      if (response.error) {
+        toast.error(response.error.message || 'Erro ao enviar convite')
+        return
+      }
+
+      if (response.data?.error) {
+        toast.error(response.data.error)
+        return
+      }
+
+      toast.success('Convite enviado com sucesso!')
+      setInviteOpen(false)
+      setNome('')
+      setEmail('')
+      setRole('consultor')
+
+      // Atualizar lista de usuários
+      const { data } = await supabase.from('perfis').select('*').order('created_at', { ascending: false })
+      setUsers((data as Perfil[]) || [])
+    } catch {
+      toast.error('Erro inesperado ao enviar convite')
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (loading) {
