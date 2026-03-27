@@ -43,6 +43,7 @@ export default function LeadDetailPage() {
   const [newNote, setNewNote] = useState('')
   const [isPJ, setIsPJ] = useState(!!(originalLead?.cnpj))
   const [socios, setSocios] = useState(originalLead?.socios || [])
+  const [uploadedFiles, setUploadedFiles] = useState<{ file: File; nome_descricao: string }[]>([])
 
   // Sections
   const [openSections, setOpenSections] = useState({ basico: true, negociacao: true, contratual: true, docs: true, financeiro: true, historico: true })
@@ -91,7 +92,9 @@ export default function LeadDetailPage() {
       if (!lead.cpf) missing.push('CPF')
       if (isPJ && !lead.cnpj) missing.push('CNPJ')
       if (isPJ && !lead.razao_social) missing.push('Razão Social')
-      if (documentos.length === 0) missing.push('Ao menos 1 documento enviado')
+      const totalDocs = documentos.length + uploadedFiles.length
+      if (totalDocs === 0) missing.push('Ao menos 1 documento enviado')
+      if (uploadedFiles.some(f => !f.nome_descricao.trim())) missing.push('Descrição obrigatória em todos os documentos anexados')
       if (lead.status_financeiro !== 'pago') {
         setBlockingFields(['Confirme o pagamento antes de fechar este lead.'])
         setBlockingMsg('O status financeiro deve estar como "Pago" para avançar.')
@@ -318,11 +321,11 @@ export default function LeadDetailPage() {
       {/* Section 4 - Documents */}
       <Collapsible open={openSections.docs} onOpenChange={v => setOpenSections(p => ({ ...p, docs: v }))}>
         <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.docs ? "rounded-t-lg" : "rounded-lg")}>
-          <h3 className="font-semibold text-foreground">Documentos ({documentos.length})</h3>
+          <h3 className="font-semibold text-foreground">Documentos ({documentos.length + uploadedFiles.length})</h3>
           <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.docs && 'rotate-180')} />
         </CollapsibleTrigger>
         <CollapsibleContent className="rounded-b-lg border border-t-0 border-border bg-card p-4 space-y-4">
-          <FileUpload />
+          <FileUpload onFilesChange={setUploadedFiles} />
           {documentos.length > 0 && (
             <div className="space-y-2">
               {documentos.map(doc => (
