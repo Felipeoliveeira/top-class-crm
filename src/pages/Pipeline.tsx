@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -12,9 +12,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
-import { mockLeads, mockPerfis, mockDocumentos } from '@/data/mockData'
-import { LEAD_STATUS_LABELS, MOTIVO_PERDA_LABELS, type Lead, type LeadStatus, type MotivoPerdaTipo } from '@/types'
-import { Plus, GripVertical } from 'lucide-react'
+import { supabase } from '@/integrations/supabase/client'
+import { LEAD_STATUS_LABELS, MOTIVO_PERDA_LABELS, type Lead, type LeadStatus, type MotivoPerdaTipo, type Perfil } from '@/types'
+import { Plus, GripVertical, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
@@ -109,7 +109,7 @@ function DroppableColumn({ status, children }: { status: LeadStatus; children: R
   )
 }
 
-// --- Overlay Card (shown while dragging) ---
+// --- Overlay Card ---
 function OverlayCard({ lead, color, getConsultorName }: { lead: Lead; color: string; getConsultorName: (id: string) => string }) {
   return (
     <div className={cn('rounded-lg border-l-4 bg-card p-4 border border-border shadow-xl w-80', color)}>
@@ -130,7 +130,7 @@ function validateAtendimentoToNegociacao(lead: Lead): string[] {
   return missing
 }
 
-function validateNegociacaoToFechado(lead: Lead): string[] {
+async function validateNegociacaoToFechado(lead: Lead): Promise<string[]> {
   const missing: string[] = []
   if (!lead.servico_interesse) missing.push('Serviço de Interesse')
   if (!lead.valor_bruto) missing.push('Valor Bruto')
@@ -138,8 +138,12 @@ function validateNegociacaoToFechado(lead: Lead): string[] {
   if (!lead.rg) missing.push('RG')
   if (!lead.cpf) missing.push('CPF')
   if (lead.cnpj && !lead.razao_social) missing.push('Razão Social (PJ)')
-  const docs = mockDocumentos.filter(d => d.lead_id === lead.id)
-  if (docs.length === 0) missing.push('Ao menos 1 documento enviado')
+  
+  const { count } = await supabase
+    .from('documentos_lead')
+    .select('*', { count: 'exact', head: true })
+    .eq('lead_id', lead.id)
+  if (!count || count === 0) missing.push('Ao menos 1 documento enviado')
   if (lead.status_financeiro !== 'pago') missing.push('Status Financeiro = Pago')
   return missing
 }
@@ -148,7 +152,10 @@ export default function PipelinePage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { canViewAllLeads, canAssignConsultor } = usePermissions()
-  const [leads, setLeads] = useState<Lead[]>(mockLeads)
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [consultores, setConsultores] = useState<Perfil[]>([])
+  const [consultorNames, setConsultorNames] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(true)
   const [newLeadOpen, setNewLeadOpen] = useState(false)
   const [mobileFilter, setMobileFilter] = useState<LeadStatus>('atendimento')
   const [activeDragLead, setActiveDragLead] = useState<Lead | null>(null)
@@ -164,33 +171,53 @@ export default function PipelinePage() {
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
   const [consultorId, setConsultorId] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true)
+      const { data: leadsData } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
+      setLeads((leadsData as Lead[]) || [])
+
+      const { data: perfisData } = await supabase.from('perfis').select('*').eq('role', 'consultor').eq('status', 'ativo')
+      setConsultores((perfisData as Perfil[]) || [])
+
+      const { data: allPerfis } = await supabase.from('perfis').select('id, nome_completo')
+      const names: Record<string, string> = {}
+      allPerfis?.forEach(p => { names[p.id] = p.nome_completo })
+      setConsultorNames(names)
+      setLoading(false)
+    }
+    fetchData()
+  }, [])
 
   const filteredLeads = useMemo(() => {
-    if (canViewAllLeads) return leads
-    return leads.filter(l => l.consultor_id === user?.id)
-  }, [leads, canViewAllLeads, user?.id])
+    return leads
+  }, [leads])
 
-  const consultores = mockPerfis.filter(p => p.role === 'consultor' && p.status === 'ativo')
-  const getConsultorName = (id: string) => mockPerfis.find(p => p.id === id)?.nome_completo || 'N/A'
+  const getConsultorName = (id: string) => consultorNames[id] || 'N/A'
 
   const canCreate = nome && telefone && (canAssignConsultor ? consultorId : true)
 
-  const handleCreate = () => {
-    const newLead: Lead = {
-      id: Date.now(),
+  const handleCreate = async () => {
+    setCreating(true)
+    const { data, error } = await supabase.from('leads').insert({
       consultor_id: canAssignConsultor ? consultorId : (user?.id || ''),
-      nome, telefone,
-      origem: null, necessidade: null,
+      nome,
+      telefone,
       status: 'atendimento',
-      servico_interesse: null, valor_bruto: null, porcentagem_desconto: null, valor_liquido: null,
-      email: null, rg: null, cpf: null, cnpj: null, razao_social: null, contato_numero: null,
-      socios: null, status_financeiro: null, data_prevista_pagamento: null,
-      motivo_perda_tipo: null, motivo_perda_descricao: null,
-      created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ultima_movimentacao_at: null,
+    }).select().single()
+
+    if (error) {
+      toast.error('Erro ao criar lead: ' + error.message)
+      setCreating(false)
+      return
     }
-    setLeads(prev => [newLead, ...prev])
+
+    setLeads(prev => [data as Lead, ...prev])
     setNewLeadOpen(false)
     setNome(''); setTelefone(''); setConsultorId('')
+    setCreating(false)
     toast.success('Lead criado com sucesso!')
   }
 
@@ -204,7 +231,7 @@ export default function PipelinePage() {
     if (lead) setActiveDragLead(lead)
   }
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setActiveDragLead(null)
     const { active, over } = event
     if (!over) return
@@ -212,13 +239,11 @@ export default function PipelinePage() {
     const lead = (active.data.current as { lead: Lead })?.lead
     if (!lead) return
 
-    // Determine target column
     const overId = String(over.id)
     let targetStatus: LeadStatus | null = null
     if (overId.startsWith('column-')) {
       targetStatus = overId.replace('column-', '') as LeadStatus
     } else if (overId.startsWith('lead-')) {
-      // Dropped on another card — find that card's status
       const targetLeadId = Number(overId.replace('lead-', ''))
       const targetLead = leads.find(l => l.id === targetLeadId)
       targetStatus = targetLead?.status || null
@@ -226,7 +251,6 @@ export default function PipelinePage() {
 
     if (!targetStatus || targetStatus === lead.status) return
 
-    // Invalid retroactive moves
     if (lead.status === 'fechado' && (targetStatus === 'atendimento' || targetStatus === 'negociacao')) {
       toast.error('Esta movimentação não é permitida.')
       return
@@ -236,7 +260,6 @@ export default function PipelinePage() {
       return
     }
 
-    // Move to Perdido → open loss modal
     if (targetStatus === 'perdido') {
       setLossLeadId(lead.id)
       setLossOriginalStatus(lead.status)
@@ -246,7 +269,6 @@ export default function PipelinePage() {
       return
     }
 
-    // Atendimento → Negociação
     if (lead.status === 'atendimento' && targetStatus === 'negociacao') {
       const missing = validateAtendimentoToNegociacao(lead)
       if (missing.length > 0) {
@@ -255,19 +277,17 @@ export default function PipelinePage() {
       }
     }
 
-    // Negociação → Fechado
     if (lead.status === 'negociacao' && targetStatus === 'fechado') {
-      const missing = validateNegociacaoToFechado(lead)
+      const missing = await validateNegociacaoToFechado(lead)
       if (missing.length > 0) {
         toast.error(`Preencha os campos obrigatórios no detalhe do lead para avançar: ${missing.join(', ')}`)
         return
       }
     }
 
-    // Atendimento → Fechado (skip negociacao — validate both)
     if (lead.status === 'atendimento' && targetStatus === 'fechado') {
       const missing1 = validateAtendimentoToNegociacao(lead)
-      const missing2 = validateNegociacaoToFechado(lead)
+      const missing2 = await validateNegociacaoToFechado(lead)
       const allMissing = [...missing1, ...missing2]
       if (allMissing.length > 0) {
         toast.error(`Preencha os campos obrigatórios no detalhe do lead para avançar: ${allMissing.join(', ')}`)
@@ -275,7 +295,12 @@ export default function PipelinePage() {
       }
     }
 
-    // Valid move
+    const { error } = await supabase.from('leads').update({ status: targetStatus }).eq('id', lead.id)
+    if (error) {
+      toast.error('Erro ao mover lead: ' + error.message)
+      return
+    }
+
     setLeads(prev => prev.map(l => l.id === lead.id
       ? { ...l, status: targetStatus!, updated_at: new Date().toISOString(), ultima_movimentacao_at: new Date().toISOString() }
       : l
@@ -283,9 +308,20 @@ export default function PipelinePage() {
     toast.success(`Lead movido para ${LEAD_STATUS_LABELS[targetStatus]}`)
   }, [leads])
 
-  const handleConfirmLoss = () => {
+  const handleConfirmLoss = async () => {
     if (!lossMotivo) return
     if (lossMotivo === 'outro' && !lossDescricao.trim()) return
+
+    const { error } = await supabase.from('leads').update({
+      status: 'perdido',
+      motivo_perda_tipo: lossMotivo as MotivoPerdaTipo,
+      motivo_perda_descricao: lossMotivo === 'outro' ? lossDescricao : null,
+    }).eq('id', lossLeadId!)
+
+    if (error) {
+      toast.error('Erro ao atualizar lead: ' + error.message)
+      return
+    }
 
     setLeads(prev => prev.map(l => l.id === lossLeadId
       ? {
@@ -303,7 +339,7 @@ export default function PipelinePage() {
     toast.success(`Lead movido para ${LEAD_STATUS_LABELS.perdido}`)
   }
 
-  const moveLeadMobile = (lead: Lead, newStatus: LeadStatus) => {
+  const moveLeadMobile = async (lead: Lead, newStatus: LeadStatus) => {
     if (newStatus === 'perdido') {
       setLossLeadId(lead.id)
       setLossOriginalStatus(lead.status)
@@ -321,11 +357,17 @@ export default function PipelinePage() {
       }
     }
     if (lead.status === 'negociacao' && newStatus === 'fechado') {
-      const missing = validateNegociacaoToFechado(lead)
+      const missing = await validateNegociacaoToFechado(lead)
       if (missing.length > 0) {
         toast.error(`Preencha os campos obrigatórios: ${missing.join(', ')}`)
         return
       }
+    }
+
+    const { error } = await supabase.from('leads').update({ status: newStatus }).eq('id', lead.id)
+    if (error) {
+      toast.error('Erro ao mover lead')
+      return
     }
 
     setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: newStatus, updated_at: new Date().toISOString() } : l))
@@ -333,6 +375,14 @@ export default function PipelinePage() {
   }
 
   const getCardColor = (status: LeadStatus) => statusColumns.find(c => c.status === status)?.color || ''
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -457,7 +507,10 @@ export default function PipelinePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewLeadOpen(false)} className="border-border text-foreground">Cancelar</Button>
-            <Button onClick={handleCreate} disabled={!canCreate} className="bg-primary text-primary-foreground hover:bg-primary/90">Criar Lead</Button>
+            <Button onClick={handleCreate} disabled={!canCreate || creating} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Criar Lead
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

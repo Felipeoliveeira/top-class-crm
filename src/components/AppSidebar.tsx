@@ -62,7 +62,7 @@ export function AppSidebar() {
             <p className="text-sm font-medium text-foreground truncate">{user?.nome_completo}</p>
             <StatusBadge status={user?.role || 'consultor'} className="mt-0.5" />
           </div>
-          <button onClick={logout} className="text-muted-foreground hover:text-foreground transition-colors" title="Sair">
+          <button onClick={() => logout()} className="text-muted-foreground hover:text-foreground transition-colors" title="Sair">
             <LogOut className="h-4 w-4" />
           </button>
         </div>
