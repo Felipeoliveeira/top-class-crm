@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TopClassLogo } from '@/components/TopClassLogo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
+import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
@@ -14,8 +15,8 @@ export default function SetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  // TODO: Check token from URL hash for recovery vs invite
   const isInvite = window.location.hash.includes('type=invite')
+  const isRecovery = window.location.hash.includes('type=recovery')
   const title = isInvite ? 'Crie sua senha' : 'Redefina sua senha'
 
   const valid = password.length >= 8 && password === confirm
@@ -24,11 +25,14 @@ export default function SetPasswordPage() {
     e.preventDefault()
     if (!valid) return
     setLoading(true)
-    // TODO: Substituir por supabase.auth.updateUser({ password })
-    await new Promise(r => setTimeout(r, 1000))
+    const { error } = await supabase.auth.updateUser({ password })
     setLoading(false)
-    toast.success('Senha definida com sucesso!')
-    navigate('/login')
+    if (error) {
+      toast.error('Erro ao definir senha: ' + error.message)
+    } else {
+      toast.success('Senha definida com sucesso!')
+      navigate('/login')
+    }
   }
 
   return (

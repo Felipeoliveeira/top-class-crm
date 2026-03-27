@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -14,12 +14,14 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Dialog } from '@/components/ui/dialog'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
-import { mockLeads, mockPerfis, mockHistorico, mockDocumentos } from '@/data/mockData'
+import { supabase } from '@/integrations/supabase/client'
 import {
   LEAD_ORIGEM_LABELS, LEAD_NECESSIDADE_LABELS, SERVICO_LABELS, MOTIVO_PERDA_LABELS,
-  type Lead, type LeadOrigem, type LeadNecessidade, type ServicoInteresse, type MotivoPerdaTipo, type StatusFinanceiro
+  type Lead, type LeadOrigem, type LeadNecessidade, type ServicoInteresse, type MotivoPerdaTipo, type StatusFinanceiro,
+  type HistoricoInteracao, type DocumentoLead, type Perfil
 } from '@/types'
 import { ChevronDown, Save, ArrowRight, XCircle, UserX, Loader2, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -31,8 +33,8 @@ export default function LeadDetailPage() {
   const { user } = useAuth()
   const { canAssignConsultor, canInactivateLead, canMarkAsLost, canAddInteraction } = usePermissions()
 
-  const originalLead = mockLeads.find(l => l.id === Number(id))
-  const [lead, setLead] = useState<Lead | null>(originalLead || null)
+  const [lead, setLead] = useState<Lead | null>(null)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [blockingFields, setBlockingFields] = useState<string[]>([])
   const [blockingMsg, setBlockingMsg] = useState('')
@@ -41,16 +43,57 @@ export default function LeadDetailPage() {
   const [lossMotive, setLossMotive] = useState<MotivoPerdaTipo | ''>('')
   const [lossDesc, setLossDesc] = useState('')
   const [newNote, setNewNote] = useState('')
-  const [isPJ, setIsPJ] = useState(!!(originalLead?.cnpj))
-  const [socios, setSocios] = useState(originalLead?.socios || [])
+  const [isPJ, setIsPJ] = useState(false)
+  const [socios, setSocios] = useState<{ nome: string; contato: string }[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<{ file: File; nome_descricao: string }[]>([])
+
+  const [historico, setHistorico] = useState<(HistoricoInteracao & { autor_nome?: string })[]>([])
+  const [documentos, setDocumentos] = useState<DocumentoLead[]>([])
+  const [consultores, setConsultores] = useState<Perfil[]>([])
 
   // Sections
   const [openSections, setOpenSections] = useState({ basico: true, negociacao: true, contratual: true, docs: true, financeiro: true, historico: true })
 
-  const historico = mockHistorico.filter(h => h.lead_id === Number(id)).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  const documentos = mockDocumentos.filter(d => d.lead_id === Number(id))
-  const consultores = mockPerfis.filter(p => p.role === 'consultor' && p.status === 'ativo')
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true)
+      
+      const { data: leadData } = await supabase.from('leads').select('*').eq('id', Number(id)).single()
+      if (!leadData) { setLoading(false); return }
+      setLead(leadData as Lead)
+      setIsPJ(!!(leadData as Lead).cnpj)
+      setSocios(((leadData as Lead).socios as { nome: string; contato: string }[]) || [])
+
+      // Fetch related data in parallel
+      const [historicoRes, docsRes, consultoresRes] = await Promise.all([
+        supabase.from('historico_interacoes').select('*').eq('lead_id', Number(id)).order('created_at', { ascending: false }),
+        supabase.from('documentos_lead').select('*').eq('lead_id', Number(id)),
+        supabase.from('perfis').select('*').eq('role', 'consultor').eq('status', 'ativo'),
+      ])
+
+      // Fetch author names for historico
+      const autorIds = [...new Set((historicoRes.data || []).map(h => h.autor_id))]
+      let autorNames: Record<string, string> = {}
+      if (autorIds.length > 0) {
+        const { data: autores } = await supabase.from('perfis').select('id, nome_completo').in('id', autorIds)
+        autores?.forEach(a => { autorNames[a.id] = a.nome_completo })
+      }
+
+      setHistorico((historicoRes.data || []).map(h => ({ ...h, autor_nome: autorNames[h.autor_id] })) as (HistoricoInteracao & { autor_nome?: string })[])
+      setDocumentos((docsRes.data || []) as DocumentoLead[])
+      setConsultores((consultoresRes.data || []) as Perfil[])
+      setLoading(false)
+    }
+    fetchData()
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   if (!lead) return <div className="p-8 text-center text-muted-foreground">Lead não encontrado</div>
 
@@ -58,7 +101,6 @@ export default function LeadDetailPage() {
     setLead(prev => {
       if (!prev) return prev
       const updated = { ...prev, [field]: value }
-      // Auto-calculate valor_liquido
       if (field === 'valor_bruto' || field === 'porcentagem_desconto') {
         const bruto = field === 'valor_bruto' ? (value as number) : (prev.valor_bruto || 0)
         const desc = field === 'porcentagem_desconto' ? (value as number) : (prev.porcentagem_desconto || 0)
@@ -69,22 +111,47 @@ export default function LeadDetailPage() {
   }
 
   const handleSave = async () => {
+    if (!lead) return
     setSaving(true)
-    // TODO: Substituir por update Supabase — tabela: leads
-    await new Promise(r => setTimeout(r, 500))
+    const { error } = await supabase.from('leads').update({
+      nome: lead.nome,
+      telefone: lead.telefone,
+      origem: lead.origem,
+      necessidade: lead.necessidade,
+      consultor_id: lead.consultor_id,
+      servico_interesse: lead.servico_interesse,
+      valor_bruto: lead.valor_bruto,
+      porcentagem_desconto: lead.porcentagem_desconto,
+      valor_liquido: lead.valor_liquido,
+      email: lead.email,
+      rg: lead.rg,
+      cpf: lead.cpf,
+      cnpj: lead.cnpj,
+      razao_social: lead.razao_social,
+      contato_numero: lead.contato_numero,
+      socios: socios.length > 0 ? socios : null,
+      status_financeiro: lead.status_financeiro,
+      data_prevista_pagamento: lead.data_prevista_pagamento,
+      status: lead.status,
+      motivo_perda_tipo: lead.motivo_perda_tipo,
+      motivo_perda_descricao: lead.motivo_perda_descricao,
+    }).eq('id', lead.id)
+
     setSaving(false)
-    toast.success('Lead salvo com sucesso!')
+    if (error) {
+      toast.error('Erro ao salvar: ' + error.message)
+    } else {
+      toast.success('Lead salvo com sucesso!')
+    }
   }
 
   const validateAdvance = (): boolean => {
     const missing: string[] = []
 
     if (lead.status === 'atendimento') {
-      // → Negociação: requer Origem e Necessidade
       if (!lead.origem) missing.push('Origem')
       if (!lead.necessidade) missing.push('Necessidade Identificada')
     } else if (lead.status === 'negociacao') {
-      // → Fechado
       if (!lead.servico_interesse) missing.push('Serviço de Interesse')
       if (!lead.valor_bruto) missing.push('Valor Bruto')
       if (!lead.email) missing.push('E-mail')
@@ -112,9 +179,16 @@ export default function LeadDetailPage() {
     return true
   }
 
-  const handleAdvance = () => {
+  const handleAdvance = async () => {
     if (!validateAdvance()) return
     const nextStatus = lead.status === 'atendimento' ? 'negociacao' : lead.status === 'negociacao' ? 'fechado' : lead.status
+
+    const { error } = await supabase.from('leads').update({ status: nextStatus }).eq('id', lead.id)
+    if (error) {
+      toast.error('Erro ao avançar: ' + error.message)
+      return
+    }
+
     setLead(prev => prev ? { ...prev, status: nextStatus as Lead['status'] } : prev)
     toast.success(`Lead avançou para ${lead.status === 'atendimento' ? 'Negociação' : 'Fechado'}!`)
   }
@@ -123,12 +197,42 @@ export default function LeadDetailPage() {
   const canLose = (lead.status === 'atendimento' || lead.status === 'negociacao') && canMarkAsLost(lead.consultor_id)
   const canInactivate = lead.status === 'fechado' && canInactivateLead(lead.consultor_id)
 
-  const handleLoss = () => {
+  const handleLoss = async () => {
     if (!lossMotive) return
     if (lossMotive === 'outro' && !lossDesc.trim()) return
+
+    const { error } = await supabase.from('leads').update({
+      status: 'perdido',
+      motivo_perda_tipo: lossMotive as MotivoPerdaTipo,
+      motivo_perda_descricao: lossMotive === 'outro' ? lossDesc : null,
+    }).eq('id', lead.id)
+
+    if (error) {
+      toast.error('Erro ao marcar como perdido')
+      return
+    }
+
     setLead(prev => prev ? { ...prev, status: 'perdido', motivo_perda_tipo: lossMotive as MotivoPerdaTipo, motivo_perda_descricao: lossMotive === 'outro' ? lossDesc : null } : prev)
     setLossOpen(false)
     toast.success('Lead marcado como perdido')
+  }
+
+  const handleAddNote = async () => {
+    if (!newNote.trim() || !user) return
+    const { data, error } = await supabase.from('historico_interacoes').insert({
+      lead_id: Number(id),
+      autor_id: user.id,
+      anotacao: newNote.trim(),
+    }).select().single()
+
+    if (error) {
+      toast.error('Erro ao registrar anotação')
+      return
+    }
+
+    setHistorico(prev => [{ ...data, autor_nome: user.nome_completo } as (HistoricoInteracao & { autor_nome?: string }), ...prev])
+    setNewNote('')
+    toast.success('Anotação registrada!')
   }
 
   const addSocio = () => setSocios(prev => [...prev, { nome: '', contato: '' }])
@@ -159,7 +263,11 @@ export default function LeadDetailPage() {
               </Button>
             )}
             {canInactivate && (
-              <Button variant="outline" className="border-muted-foreground text-muted-foreground" onClick={() => { setLead(p => p ? { ...p, status: 'inativo' } : p); toast.success('Cliente inativado') }}>
+              <Button variant="outline" className="border-muted-foreground text-muted-foreground" onClick={async () => {
+                await supabase.from('leads').update({ status: 'inativo' }).eq('id', lead.id)
+                setLead(p => p ? { ...p, status: 'inativo' } : p)
+                toast.success('Cliente inativado')
+              }}>
                 <UserX className="mr-2 h-4 w-4" /> Inativar
               </Button>
             )}
@@ -388,7 +496,7 @@ export default function LeadDetailPage() {
             <div className="space-y-2">
               <Textarea placeholder="Registrar nova anotação..." value={newNote} onChange={e => setNewNote(e.target.value)} className="bg-background border-border min-h-[80px]" />
               <Button
-                onClick={() => { if (newNote.trim()) { toast.success('Anotação registrada!'); setNewNote('') } }}
+                onClick={handleAddNote}
                 disabled={!newNote.trim()}
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
                 size="sm"
@@ -399,8 +507,7 @@ export default function LeadDetailPage() {
           )}
           <div className="space-y-4">
             {historico.map(h => {
-              const autor = mockPerfis.find(p => p.id === h.autor_id)
-              const initials = autor?.nome_completo.split(' ').map(n => n[0]).join('').slice(0, 2) || '??'
+              const initials = h.autor_nome?.split(' ').map(n => n[0]).join('').slice(0, 2) || '??'
               return (
                 <div key={h.id} className="flex gap-3">
                   <div className="flex flex-col items-center">
@@ -409,7 +516,7 @@ export default function LeadDetailPage() {
                   </div>
                   <div className="flex-1 pb-4">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-foreground">{autor?.nome_completo}</span>
+                      <span className="text-sm font-medium text-foreground">{h.autor_nome || 'Desconhecido'}</span>
                       <span className="text-xs text-muted-foreground">{new Date(h.created_at).toLocaleString('pt-BR')}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">{h.anotacao}</p>
@@ -461,6 +568,3 @@ export default function LeadDetailPage() {
     </div>
   )
 }
-
-// Need Dialog import for loss modal
-import { Dialog } from '@/components/ui/dialog'

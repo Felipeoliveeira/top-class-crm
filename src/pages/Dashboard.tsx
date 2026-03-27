@@ -1,12 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { KpiCard } from '@/components/KpiCard'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
-import { mockLeads, mockPerfis, mockDailyData } from '@/data/mockData'
+import { supabase } from '@/integrations/supabase/client'
 import { LEAD_ORIGEM_LABELS, SERVICO_LABELS } from '@/types'
-import type { LeadOrigem } from '@/types'
-import { Users, TrendingUp, CheckCircle, DollarSign, XCircle, TrendingDown, Percent } from 'lucide-react'
+import type { LeadOrigem, Lead, Perfil } from '@/types'
+import { Users, TrendingUp, CheckCircle, DollarSign, XCircle, TrendingDown, Percent, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts'
@@ -27,57 +27,94 @@ const origemColors: Record<string, string> = {
   rede_social: '#16A34A',
 }
 
+function getDateFilter(filter: TimeFilter): string | null {
+  const now = new Date()
+  if (filter === 'hoje') return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+  if (filter === '7dias') { now.setDate(now.getDate() - 7); return now.toISOString() }
+  if (filter === '30dias') { now.setDate(now.getDate() - 30); return now.toISOString() }
+  return null
+}
+
 export default function DashboardPage() {
   const { user } = useAuth()
   const { canViewAllDashboard, canViewFinancialKpis, canViewPerformanceTable } = usePermissions()
   const [filter, setFilter] = useState<TimeFilter>('30dias')
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [consultores, setConsultores] = useState<Perfil[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // TODO: Substituir por query Supabase — tabela: leads, filtrar por período e consultor_id via RLS
-  const leads = useMemo(() => {
-    let filtered = mockLeads
-    if (!canViewAllDashboard) {
-      filtered = filtered.filter(l => l.consultor_id === user?.id)
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true)
+      let query = supabase.from('leads').select('*')
+      const dateFilter = getDateFilter(filter)
+      if (dateFilter) query = query.gte('created_at', dateFilter)
+      
+      const { data: leadsData } = await query
+      setLeads((leadsData as Lead[]) || [])
+
+      if (canViewPerformanceTable) {
+        const { data: perfisData } = await supabase
+          .from('perfis')
+          .select('*')
+          .eq('role', 'consultor')
+          .eq('status', 'ativo')
+        setConsultores((perfisData as Perfil[]) || [])
+      }
+      setLoading(false)
     }
-    // Time filter would be applied here with real data
-    return filtered
-  }, [canViewAllDashboard, user?.id, filter])
+    fetchData()
+  }, [filter, canViewPerformanceTable])
 
   const totalLeads = leads.length
   const fechados = leads.filter(l => l.status === 'fechado')
   const perdidos = leads.filter(l => l.status === 'perdido')
-  const conversionRate = totalLeads > 0 ? Math.round((fechados.length / (totalLeads - perdidos.length)) * 100) : 0
+  const conversionRate = totalLeads > 0 ? Math.round((fechados.length / Math.max(totalLeads - perdidos.length, 1)) * 100) : 0
   const valorGanho = fechados.filter(l => l.status_financeiro === 'pago').reduce((sum, l) => sum + (l.valor_liquido || 0), 0)
   const valorPerdido = perdidos.reduce((sum, l) => sum + (l.valor_bruto || 0), 0)
   const totalDescontos = fechados.reduce((sum, l) => sum + ((l.valor_bruto || 0) - (l.valor_liquido || 0)), 0)
 
-  // TODO: Substituir por query Supabase — tabela: leads, agrupar por origem, todos os status
   const origemData = (['indicacao', 'google', 'placa', 'rede_social'] as LeadOrigem[]).map(o => ({
     name: LEAD_ORIGEM_LABELS[o],
     value: leads.filter(l => l.origem === o).length,
     key: o,
   }))
 
-  // TODO: Substituir por query Supabase — tabela: leads, agrupar por origem, filtro status = 'fechado'
   const clientesOrigemData = (['indicacao', 'google', 'placa', 'rede_social'] as LeadOrigem[]).map(o => ({
     name: LEAD_ORIGEM_LABELS[o],
     value: fechados.filter(l => l.origem === o).length,
     key: o,
   }))
 
-  // TODO: Substituir por query Supabase — tabela: leads, agrupar por servico_interesse, todos os status
   const servicoData = Object.entries(SERVICO_LABELS).map(([key, label]) => ({
     name: label,
     value: leads.filter(l => l.servico_interesse === key).length,
   })).sort((a, b) => b.value - a.value)
 
-  // TODO: Substituir por query Supabase — tabela: leads, agrupar por servico_interesse, filtro status = 'fechado'
   const clientesServicoData = Object.entries(SERVICO_LABELS).map(([key, label]) => ({
     name: label,
     value: fechados.filter(l => l.servico_interesse === key).length,
   })).sort((a, b) => b.value - a.value)
 
-  // Performance by consultant
-  const consultores = mockPerfis.filter(p => p.role === 'consultor' && p.status === 'ativo')
+  // Daily data from actual leads
+  const dailyData = useMemo(() => {
+    const days: Record<string, { leads: number; ganhos: number }> = {}
+    leads.forEach(l => {
+      const d = l.created_at.split('T')[0]
+      if (!days[d]) days[d] = { leads: 0, ganhos: 0 }
+      days[d].leads++
+      if (l.status === 'fechado') days[d].ganhos++
+    })
+    return Object.entries(days).sort(([a], [b]) => a.localeCompare(b)).map(([date, v]) => ({ date, ...v }))
+  }, [leads])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -117,7 +154,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Charts Row - Line + Leads por Origem + Clientes por Origem */}
+      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
         <Card className="lg:col-span-2 border-border bg-card">
           <CardHeader>
@@ -125,7 +162,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={mockDailyData}>
+              <LineChart data={dailyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(213, 32%, 26%)" />
                 <XAxis dataKey="date" tick={{ fill: '#94A3B8', fontSize: 11 }} tickFormatter={v => v.slice(5)} />
                 <YAxis tick={{ fill: '#94A3B8', fontSize: 11 }} />
@@ -247,10 +284,10 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {consultores.map(c => {
-                    const cLeads = mockLeads.filter(l => l.consultor_id === c.id)
+                    const cLeads = leads.filter(l => l.consultor_id === c.id)
                     const cFechados = cLeads.filter(l => l.status === 'fechado')
                     const cPerdidos = cLeads.filter(l => l.status === 'perdido')
-                    const cConv = cLeads.length > 0 ? Math.round((cFechados.length / (cLeads.length - cPerdidos.length)) * 100) : 0
+                    const cConv = cLeads.length > 0 ? Math.round((cFechados.length / Math.max(cLeads.length - cPerdidos.length, 1)) * 100) : 0
                     const cValor = cFechados.filter(l => l.status_financeiro === 'pago').reduce((s, l) => s + (l.valor_liquido || 0), 0)
                     const initials = c.nome_completo.split(' ').map(n => n[0]).join('').slice(0, 2)
                     return (

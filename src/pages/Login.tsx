@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TopClassLogo } from '@/components/TopClassLogo'
 import { Button } from '@/components/ui/button'
@@ -12,13 +12,18 @@ import { Loader2 } from 'lucide-react'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const { login, isLoading, isAuthenticated } = useAuth()
+  const { login, isLoading, isAuthenticated, initialize, initialized } = useAuth()
   const navigate = useNavigate()
 
-  if (isAuthenticated) {
-    navigate('/dashboard', { replace: true })
-    return null
-  }
+  useEffect(() => {
+    initialize()
+  }, [initialize])
+
+  useEffect(() => {
+    if (initialized && isAuthenticated) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [initialized, isAuthenticated, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,7 +32,7 @@ export default function LoginPage() {
       toast.success('Login realizado com sucesso!')
       navigate('/dashboard')
     } else {
-      toast.error('Credenciais inválidas')
+      toast.error('Credenciais inválidas ou usuário inativo')
     }
   }
 
@@ -77,36 +82,6 @@ export default function LoginPage() {
               </a>
             </p>
           </form>
-
-          <div className="mt-6 border-t border-border pt-4">
-            <p className="text-center text-xs text-muted-foreground mb-3">Acesso rápido (demo):</p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="flex-1 border-border text-foreground hover:bg-surface-elevated text-xs"
-                onClick={async () => {
-                  const ok = await login('rodrigo@topclass.com.br', 'admin')
-                  if (ok) { toast.success('Login como Admin'); navigate('/dashboard') }
-                }}
-              >
-                Admin
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="flex-1 border-border text-foreground hover:bg-surface-elevated text-xs"
-                onClick={async () => {
-                  const ok = await login('ana.paula@topclass.com.br', 'consultor')
-                  if (ok) { toast.success('Login como Consultor'); navigate('/dashboard') }
-                }}
-              >
-                Consultor
-              </Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

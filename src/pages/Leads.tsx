@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -7,9 +7,9 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
-import { mockLeads, mockPerfis } from '@/data/mockData'
-import { LEAD_STATUS_LABELS, LEAD_ORIGEM_LABELS, type LeadStatus, type LeadOrigem } from '@/types'
-import { Pencil, UserX, Download, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { supabase } from '@/integrations/supabase/client'
+import { LEAD_STATUS_LABELS, LEAD_ORIGEM_LABELS, type Lead, type LeadStatus, type LeadOrigem } from '@/types'
+import { Pencil, UserX, Download, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function LeadsPage() {
@@ -17,15 +17,33 @@ export default function LeadsPage() {
   const { canViewAllLeads, canExportCsv, canInactivateLead } = usePermissions()
   const navigate = useNavigate()
 
+  const [allLeads, setAllLeads] = useState<Lead[]>([])
+  const [consultorNames, setConsultorNames] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all')
   const [origemFilter, setOrigemFilter] = useState<LeadOrigem | 'all'>('all')
   const [page, setPage] = useState(1)
   const perPage = 25
 
-  // TODO: Substituir por query Supabase — tabela: leads, RLS por consultor_id
-  const allLeads = useMemo(() => {
-    let data = canViewAllLeads ? mockLeads : mockLeads.filter(l => l.consultor_id === user?.id)
+  useEffect(() => {
+    async function fetchLeads() {
+      setLoading(true)
+      const { data } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
+      setAllLeads((data as Lead[]) || [])
+
+      // Fetch consultor names
+      const { data: perfis } = await supabase.from('perfis').select('id, nome_completo')
+      const names: Record<string, string> = {}
+      perfis?.forEach(p => { names[p.id] = p.nome_completo })
+      setConsultorNames(names)
+      setLoading(false)
+    }
+    fetchLeads()
+  }, [])
+
+  const filteredLeads = useMemo(() => {
+    let data = allLeads
     if (search) {
       const s = search.toLowerCase()
       data = data.filter(l => l.nome.toLowerCase().includes(s) || l.telefone.includes(s) || (l.email || '').toLowerCase().includes(s))
@@ -33,21 +51,29 @@ export default function LeadsPage() {
     if (statusFilter !== 'all') data = data.filter(l => l.status === statusFilter)
     if (origemFilter !== 'all') data = data.filter(l => l.origem === origemFilter)
     return data
-  }, [canViewAllLeads, user?.id, search, statusFilter, origemFilter])
+  }, [allLeads, search, statusFilter, origemFilter])
 
-  const totalPages = Math.ceil(allLeads.length / perPage)
-  const paginatedLeads = allLeads.slice((page - 1) * perPage, page * perPage)
-  const getConsultor = (id: string) => mockPerfis.find(p => p.id === id)?.nome_completo || 'N/A'
+  const totalPages = Math.ceil(filteredLeads.length / perPage)
+  const paginatedLeads = filteredLeads.slice((page - 1) * perPage, page * perPage)
+  const getConsultor = (id: string) => consultorNames[id] || 'N/A'
 
   const exportCsv = () => {
     toast.success('CSV exportado com sucesso!')
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="Leads"
-        subtitle={`${allLeads.length} leads encontrados`}
+        subtitle={`${filteredLeads.length} leads encontrados`}
         actions={
           canExportCsv ? (
             <Button onClick={exportCsv} variant="outline" className="hidden md:flex border-border text-foreground hover:bg-surface-elevated">
@@ -144,7 +170,7 @@ export default function LeadsPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
           <p className="text-sm text-muted-foreground">
-            Exibindo {(page - 1) * perPage + 1}–{Math.min(page * perPage, allLeads.length)} de {allLeads.length} leads
+            Exibindo {(page - 1) * perPage + 1}–{Math.min(page * perPage, filteredLeads.length)} de {filteredLeads.length} leads
           </p>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="h-8 w-8 border-border text-foreground">
