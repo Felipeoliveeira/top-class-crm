@@ -5,12 +5,20 @@ import { AppHeader } from './AppHeader'
 import { useAuth } from '@/hooks/useAuth'
 import { Loader2 } from 'lucide-react'
 
+const STATUS_CHECK_INTERVAL_MS = 30_000
+
 export function AppLayout() {
-  const { isAuthenticated, initialize, initialized } = useAuth()
+  const { isAuthenticated, initialize, initialized, checkActiveStatus } = useAuth()
 
   useEffect(() => {
     initialize()
   }, [initialize])
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const interval = setInterval(checkActiveStatus, STATUS_CHECK_INTERVAL_MS)
+    return () => clearInterval(interval)
+  }, [isAuthenticated, checkActiveStatus])
 
   if (!initialized) {
     return (

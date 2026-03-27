@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
 import { supabase } from '@/integrations/supabase/client'
+import { inactivateLead } from '@/services/pipeline'
 import { LEAD_STATUS_LABELS, LEAD_ORIGEM_LABELS, type Lead, type LeadStatus, type LeadOrigem } from '@/types'
 import { Pencil, UserX, Download, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -141,7 +142,16 @@ export default function LeadsPage() {
                       <Pencil className="h-4 w-4" />
                     </Button>
                     {lead.status === 'fechado' && canInactivateLead(lead.consultor_id) && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => toast.info('Inativação em breve')}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={async (e) => {
+                        e.stopPropagation()
+                        try {
+                          await inactivateLead(lead)
+                          setAllLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'inativo' as LeadStatus } : l))
+                          toast.success('Cliente inativado com sucesso')
+                        } catch (err) {
+                          toast.error(`Erro ao inativar: ${(err as Error).message}`)
+                        }
+                      }}>
                         <UserX className="h-4 w-4" />
                       </Button>
                     )}

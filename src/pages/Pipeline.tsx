@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { z } from 'zod'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge } from '@/components/StatusBadge'
 import { PaymentPendingFlag } from '@/components/PaymentPendingFlag'
@@ -12,8 +13,26 @@ import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
-import { supabase } from '@/integrations/supabase/client'
-import { LEAD_STATUS_LABELS, MOTIVO_PERDA_LABELS, type Lead, type LeadStatus, type MotivoPerdaTipo, type Perfil } from '@/types'
+import {
+  usePipelineLeads,
+  useActiveConsultores,
+  useAllPerfisNames,
+  useCreateLead,
+  useAdvanceStage,
+  useMarkAsLost,
+} from '@/hooks/usePipeline'
+import {
+  isTransitionAllowed,
+  GateValidationError,
+  TransitionNotAllowedError,
+} from '@/services/pipeline'
+import {
+  LEAD_STATUS_LABELS,
+  MOTIVO_PERDA_LABELS,
+  type Lead,
+  type LeadStatus,
+  type MotivoPerdaTipo,
+} from '@/types'
 import { Plus, GripVertical, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -31,6 +50,10 @@ import { useSortable } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 
+// ---------------------------------------------------------------------------
+// Constantes visuais
+// ---------------------------------------------------------------------------
+
 const statusColumns: { status: LeadStatus; color: string }[] = [
   { status: 'atendimento', color: 'border-l-warning' },
   { status: 'negociacao', color: 'border-l-orange-500' },
@@ -46,7 +69,19 @@ const headerColors: Record<LeadStatus, string> = {
   inativo: 'text-muted-foreground',
 }
 
-// --- Draggable Card ---
+// ---------------------------------------------------------------------------
+// Validação zod — criação de lead (S-3.2.1)
+// ---------------------------------------------------------------------------
+
+const createLeadSchema = z.object({
+  nome: z.string().min(1, 'Nome é obrigatório'),
+  telefone: z.string().min(1, 'Telefone é obrigatório'),
+})
+
+// ---------------------------------------------------------------------------
+// Sub-componentes do Kanban
+// ---------------------------------------------------------------------------
+
 function DraggableLeadCard({ lead, color, getConsultorName, onClick }: {
   lead: Lead; color: string; getConsultorName: (id: string) => string; onClick: () => void
 }) {
@@ -92,7 +127,6 @@ function DraggableLeadCard({ lead, color, getConsultorName, onClick }: {
   )
 }
 
-// --- Droppable Column ---
 function DroppableColumn({ status, children }: { status: LeadStatus; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status}` })
   return (
@@ -109,7 +143,6 @@ function DroppableColumn({ status, children }: { status: LeadStatus; children: R
   )
 }
 
-// --- Overlay Card ---
 function OverlayCard({ lead, color, getConsultorName }: { lead: Lead; color: string; getConsultorName: (id: string) => string }) {
   return (
     <div className={cn('rounded-lg border-l-4 bg-card p-4 border border-border shadow-xl w-80', color)}>
@@ -122,106 +155,70 @@ function OverlayCard({ lead, color, getConsultorName }: { lead: Lead; color: str
   )
 }
 
-// --- Validation helpers ---
-function validateAtendimentoToNegociacao(lead: Lead): string[] {
-  const missing: string[] = []
-  if (!lead.origem) missing.push('Origem')
-  if (!lead.necessidade) missing.push('Necessidade Identificada')
-  return missing
-}
-
-async function validateNegociacaoToFechado(lead: Lead): Promise<string[]> {
-  const missing: string[] = []
-  if (!lead.servico_interesse) missing.push('Serviço de Interesse')
-  if (!lead.valor_bruto) missing.push('Valor Bruto')
-  if (!lead.email) missing.push('E-mail')
-  if (!lead.rg) missing.push('RG')
-  if (!lead.cpf) missing.push('CPF')
-  if (lead.cnpj && !lead.razao_social) missing.push('Razão Social (PJ)')
-  
-  const { count } = await supabase
-    .from('documentos_lead')
-    .select('*', { count: 'exact', head: true })
-    .eq('lead_id', lead.id)
-  if (!count || count === 0) missing.push('Ao menos 1 documento enviado')
-  if (lead.status_financeiro !== 'pago') missing.push('Status Financeiro = Pago')
-  return missing
-}
+// ---------------------------------------------------------------------------
+// Página principal
+// ---------------------------------------------------------------------------
 
 export default function PipelinePage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const { canViewAllLeads, canAssignConsultor } = usePermissions()
-  const [leads, setLeads] = useState<Lead[]>([])
-  const [consultores, setConsultores] = useState<Perfil[]>([])
-  const [consultorNames, setConsultorNames] = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState(true)
+  const { canAssignConsultor } = usePermissions()
+
+  // Dados via TanStack Query (S-3.1.2)
+  const { data: leads = [], isLoading } = usePipelineLeads()
+  const { data: consultores = [] } = useActiveConsultores()
+  const { data: perfisNames = {} } = useAllPerfisNames()
+  const createLeadMutation = useCreateLead()
+  const advanceStageMutation = useAdvanceStage()
+  const markAsLostMutation = useMarkAsLost()
+
+  // Estado de UI
   const [newLeadOpen, setNewLeadOpen] = useState(false)
   const [mobileFilter, setMobileFilter] = useState<LeadStatus>('atendimento')
   const [activeDragLead, setActiveDragLead] = useState<Lead | null>(null)
 
-  // Loss modal state
+  // Modal de perda
   const [lossModalOpen, setLossModalOpen] = useState(false)
-  const [lossLeadId, setLossLeadId] = useState<number | null>(null)
-  const [lossOriginalStatus, setLossOriginalStatus] = useState<LeadStatus | null>(null)
+  const [lossLead, setLossLead] = useState<Lead | null>(null)
   const [lossMotivo, setLossMotivo] = useState<MotivoPerdaTipo | ''>('')
   const [lossDescricao, setLossDescricao] = useState('')
 
-  // New lead form
+  // Form novo lead
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
   const [consultorId, setConsultorId] = useState('')
-  const [creating, setCreating] = useState(false)
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
-      const { data: leadsData } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
-      setLeads((leadsData as Lead[]) || [])
+  const getConsultorName = (id: string) => perfisNames[id] || 'N/A'
 
-      const { data: perfisData } = await supabase.from('perfis').select('*').eq('role', 'consultor').eq('status', 'ativo')
-      setConsultores((perfisData as Perfil[]) || [])
-
-      const { data: allPerfis } = await supabase.from('perfis').select('id, nome_completo')
-      const names: Record<string, string> = {}
-      allPerfis?.forEach(p => { names[p.id] = p.nome_completo })
-      setConsultorNames(names)
-      setLoading(false)
-    }
-    fetchData()
-  }, [])
-
-  const filteredLeads = useMemo(() => {
-    return leads
-  }, [leads])
-
-  const getConsultorName = (id: string) => consultorNames[id] || 'N/A'
-
-  const canCreate = nome && telefone && (canAssignConsultor ? consultorId : true)
-
+  // --- Criação de lead com zod (S-3.2.1) ---
   const handleCreate = async () => {
-    setCreating(true)
-    const { data, error } = await supabase.from('leads').insert({
-      consultor_id: canAssignConsultor ? consultorId : (user?.id || ''),
-      nome,
-      telefone,
-      status: 'atendimento',
-    }).select().single()
-
-    if (error) {
-      toast.error('Erro ao criar lead: ' + error.message)
-      setCreating(false)
+    const parsed = createLeadSchema.safeParse({ nome, telefone })
+    if (!parsed.success) {
+      toast.error(parsed.error.errors.map(e => e.message).join(', '))
       return
     }
 
-    setLeads(prev => [data as Lead, ...prev])
-    setNewLeadOpen(false)
-    setNome(''); setTelefone(''); setConsultorId('')
-    setCreating(false)
-    toast.success('Lead criado com sucesso!')
+    const consultorIdFinal = canAssignConsultor ? consultorId : (user?.id || '')
+    if (canAssignConsultor && !consultorId) {
+      toast.error('Selecione um consultor responsável')
+      return
+    }
+
+    try {
+      await createLeadMutation.mutateAsync({
+        nome: parsed.data.nome,
+        telefone: parsed.data.telefone,
+        consultor_id: consultorIdFinal,
+      })
+      setNewLeadOpen(false)
+      setNome(''); setTelefone(''); setConsultorId('')
+      toast.success('Lead criado com sucesso!')
+    } catch (err) {
+      toast.error(`Erro ao criar lead: ${(err as Error).message}`)
+    }
   }
 
-  // --- Drag and drop ---
+  // --- Drag and Drop ---
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
@@ -251,132 +248,92 @@ export default function PipelinePage() {
 
     if (!targetStatus || targetStatus === lead.status) return
 
-    if (lead.status === 'fechado' && (targetStatus === 'atendimento' || targetStatus === 'negociacao')) {
-      toast.error('Esta movimentação não é permitida.')
-      return
-    }
-    if (lead.status === 'perdido') {
+    // Valida transição via regras centralizadas (S-3.3.7)
+    if (!isTransitionAllowed(lead.status, targetStatus)) {
       toast.error('Esta movimentação não é permitida.')
       return
     }
 
+    // Perdido → abre modal de motivo (S-3.3.5)
     if (targetStatus === 'perdido') {
-      setLossLeadId(lead.id)
-      setLossOriginalStatus(lead.status)
+      setLossLead(lead)
       setLossMotivo('')
       setLossDescricao('')
       setLossModalOpen(true)
       return
     }
 
-    if (lead.status === 'atendimento' && targetStatus === 'negociacao') {
-      const missing = validateAtendimentoToNegociacao(lead)
-      if (missing.length > 0) {
-        toast.error(`Preencha os campos obrigatórios no detalhe do lead para avançar: ${missing.join(', ')}`)
-        return
+    // Avança etapa via serviço centralizado (valida gates + atualiza)
+    try {
+      await advanceStageMutation.mutateAsync({ lead, targetStatus })
+      toast.success(`Lead movido para ${LEAD_STATUS_LABELS[targetStatus]}`)
+    } catch (err) {
+      if (err instanceof GateValidationError) {
+        toast.error(`Preencha os campos obrigatórios no detalhe do lead para avançar: ${err.missingFields.join(', ')}`)
+      } else if (err instanceof TransitionNotAllowedError) {
+        toast.error('Esta movimentação não é permitida.')
+      } else {
+        toast.error(`Erro ao mover lead: ${(err as Error).message}`)
       }
     }
+  }, [leads, advanceStageMutation])
 
-    if (lead.status === 'negociacao' && targetStatus === 'fechado') {
-      const missing = await validateNegociacaoToFechado(lead)
-      if (missing.length > 0) {
-        toast.error(`Preencha os campos obrigatórios no detalhe do lead para avançar: ${missing.join(', ')}`)
-        return
-      }
-    }
-
-    if (lead.status === 'atendimento' && targetStatus === 'fechado') {
-      const missing1 = validateAtendimentoToNegociacao(lead)
-      const missing2 = await validateNegociacaoToFechado(lead)
-      const allMissing = [...missing1, ...missing2]
-      if (allMissing.length > 0) {
-        toast.error(`Preencha os campos obrigatórios no detalhe do lead para avançar: ${allMissing.join(', ')}`)
-        return
-      }
-    }
-
-    const { error } = await supabase.from('leads').update({ status: targetStatus }).eq('id', lead.id)
-    if (error) {
-      toast.error('Erro ao mover lead: ' + error.message)
-      return
-    }
-
-    setLeads(prev => prev.map(l => l.id === lead.id
-      ? { ...l, status: targetStatus!, updated_at: new Date().toISOString(), ultima_movimentacao_at: new Date().toISOString() }
-      : l
-    ))
-    toast.success(`Lead movido para ${LEAD_STATUS_LABELS[targetStatus]}`)
-  }, [leads])
-
+  // --- Confirmar perda com validação de origem (S-3.3.5) ---
   const handleConfirmLoss = async () => {
-    if (!lossMotivo) return
+    if (!lossMotivo || !lossLead) return
     if (lossMotivo === 'outro' && !lossDescricao.trim()) return
 
-    const { error } = await supabase.from('leads').update({
-      status: 'perdido',
-      motivo_perda_tipo: lossMotivo as MotivoPerdaTipo,
-      motivo_perda_descricao: lossMotivo === 'outro' ? lossDescricao : null,
-    }).eq('id', lossLeadId!)
-
-    if (error) {
-      toast.error('Erro ao atualizar lead: ' + error.message)
+    if (!isTransitionAllowed(lossLead.status, 'perdido')) {
+      toast.error('Esta movimentação não é permitida.')
+      setLossModalOpen(false)
       return
     }
 
-    setLeads(prev => prev.map(l => l.id === lossLeadId
-      ? {
-          ...l,
-          status: 'perdido' as LeadStatus,
-          motivo_perda_tipo: lossMotivo as MotivoPerdaTipo,
-          motivo_perda_descricao: lossMotivo === 'outro' ? lossDescricao : null,
-          updated_at: new Date().toISOString(),
-          ultima_movimentacao_at: new Date().toISOString(),
-        }
-      : l
-    ))
-    setLossModalOpen(false)
-    setLossLeadId(null)
-    toast.success(`Lead movido para ${LEAD_STATUS_LABELS.perdido}`)
+    try {
+      await markAsLostMutation.mutateAsync({
+        lead: lossLead,
+        motivo_perda_tipo: lossMotivo as MotivoPerdaTipo,
+        motivo_perda_descricao: lossMotivo === 'outro' ? lossDescricao : null,
+      })
+      setLossModalOpen(false)
+      setLossLead(null)
+      toast.success(`Lead movido para ${LEAD_STATUS_LABELS.perdido}`)
+    } catch (err) {
+      toast.error(`Erro ao atualizar lead: ${(err as Error).message}`)
+      setLossModalOpen(false)
+    }
   }
 
+  // --- Ações mobile ---
   const moveLeadMobile = async (lead: Lead, newStatus: LeadStatus) => {
+    if (!isTransitionAllowed(lead.status, newStatus)) {
+      toast.error('Esta movimentação não é permitida.')
+      return
+    }
+
     if (newStatus === 'perdido') {
-      setLossLeadId(lead.id)
-      setLossOriginalStatus(lead.status)
+      setLossLead(lead)
       setLossMotivo('')
       setLossDescricao('')
       setLossModalOpen(true)
       return
     }
 
-    if (lead.status === 'atendimento' && newStatus === 'negociacao') {
-      const missing = validateAtendimentoToNegociacao(lead)
-      if (missing.length > 0) {
-        toast.error(`Preencha os campos obrigatórios: ${missing.join(', ')}`)
-        return
+    try {
+      await advanceStageMutation.mutateAsync({ lead, targetStatus: newStatus })
+      toast.success(`Lead movido para ${LEAD_STATUS_LABELS[newStatus]}`)
+    } catch (err) {
+      if (err instanceof GateValidationError) {
+        toast.error(`Preencha os campos obrigatórios: ${err.missingFields.join(', ')}`)
+      } else {
+        toast.error(`Erro ao mover lead: ${(err as Error).message}`)
       }
     }
-    if (lead.status === 'negociacao' && newStatus === 'fechado') {
-      const missing = await validateNegociacaoToFechado(lead)
-      if (missing.length > 0) {
-        toast.error(`Preencha os campos obrigatórios: ${missing.join(', ')}`)
-        return
-      }
-    }
-
-    const { error } = await supabase.from('leads').update({ status: newStatus }).eq('id', lead.id)
-    if (error) {
-      toast.error('Erro ao mover lead')
-      return
-    }
-
-    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: newStatus, updated_at: new Date().toISOString() } : l))
-    toast.success(`Lead movido para ${LEAD_STATUS_LABELS[newStatus]}`)
   }
 
   const getCardColor = (status: LeadStatus) => statusColumns.find(c => c.status === status)?.color || ''
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -400,7 +357,7 @@ export default function PipelinePage() {
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex gap-4 overflow-x-auto pb-4">
             {statusColumns.map(({ status, color }) => {
-              const columnLeads = filteredLeads.filter(l => l.status === status)
+              const columnLeads = leads.filter(l => l.status === status)
               return (
                 <div key={status} className="flex-1 min-w-[280px]">
                   <div className="flex items-center justify-between mb-3 px-1">
@@ -449,7 +406,7 @@ export default function PipelinePage() {
           ))}
         </div>
         <div className="space-y-3">
-          {filteredLeads.filter(l => l.status === mobileFilter).map(lead => (
+          {leads.filter(l => l.status === mobileFilter).map(lead => (
             <div key={lead.id} className="rounded-lg bg-card border border-border p-4 space-y-2">
               <div className="flex items-center justify-between" onClick={() => navigate(`/leads/${lead.id}`)} role="button">
                 <p className="font-semibold text-foreground">{lead.nome}</p>
@@ -507,8 +464,8 @@ export default function PipelinePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewLeadOpen(false)} className="border-border text-foreground">Cancelar</Button>
-            <Button onClick={handleCreate} disabled={!canCreate || creating} className="bg-primary text-primary-foreground hover:bg-primary/90">
-              {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button onClick={handleCreate} disabled={createLeadMutation.isPending} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              {createLeadMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Criar Lead
             </Button>
           </DialogFooter>
@@ -519,7 +476,7 @@ export default function PipelinePage() {
       <Dialog open={lossModalOpen} onOpenChange={(open) => {
         if (!open) {
           setLossModalOpen(false)
-          setLossLeadId(null)
+          setLossLead(null)
         }
       }}>
         <DialogContent className="border-border bg-card sm:max-w-md">
@@ -551,12 +508,13 @@ export default function PipelinePage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setLossModalOpen(false); setLossLeadId(null) }} className="border-border text-foreground">Cancelar</Button>
+            <Button variant="outline" onClick={() => { setLossModalOpen(false); setLossLead(null) }} className="border-border text-foreground">Cancelar</Button>
             <Button
               onClick={handleConfirmLoss}
-              disabled={!lossMotivo || (lossMotivo === 'outro' && !lossDescricao.trim())}
+              disabled={!lossMotivo || (lossMotivo === 'outro' && !lossDescricao.trim()) || markAsLostMutation.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
+              {markAsLostMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirmar Perda
             </Button>
           </DialogFooter>
