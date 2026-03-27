@@ -4,6 +4,15 @@
 -- Captura o schema completo do banco de produção em 27/03/2026.
 -- Esta migration serve como ponto de partida para versionamento local.
 -- Referência: PRD-CRM-TopClass v1.1, Seção 6.2
+--
+-- NOTA DE CONSOLIDAÇÃO (27/03/2026):
+-- Este baseline já incorpora todos os fixes aplicados ao banco remoto:
+--   - fix_function_search_path: SET search_path em todas as funções
+--   - fix_rls_auth_uid_initplan: (SELECT auth.uid()) nas policies RLS
+--   - add_missing_fk_indexes: índices em todas as colunas FK
+--   - rls_explicit_deny_policies: policies de deny explícito
+--   - storage_bucket_config: bucket documentos-leads com limites
+-- Não existem migrations incrementais — tudo está neste arquivo.
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------

@@ -1,11 +1,11 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { TopClassLogo } from '@/components/TopClassLogo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { supabase } from '@/integrations/supabase/client'
-import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
 export default function RecoverPasswordPage() {
@@ -16,16 +16,11 @@ export default function RecoverPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/definir-senha`,
     })
     setLoading(false)
-    if (error) {
-      toast.error('Erro ao enviar link de recuperação')
-    } else {
-      setSent(true)
-      toast.success('Link enviado!')
-    }
+    setSent(true)
   }
 
   return (
@@ -46,9 +41,9 @@ export default function RecoverPasswordPage() {
               <p className="text-sm text-foreground">
                 Se este e-mail estiver cadastrado, você receberá um link em breve.
               </p>
-              <a href="/login" className="mt-4 inline-block text-sm text-primary hover:underline">
+              <Link to="/login" className="mt-4 inline-block text-sm text-primary hover:underline">
                 Voltar ao login
-              </a>
+              </Link>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -69,7 +64,7 @@ export default function RecoverPasswordPage() {
                 Enviar link
               </Button>
               <p className="text-center">
-                <a href="/login" className="text-sm text-muted-foreground hover:text-foreground">Voltar ao login</a>
+                <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground">Voltar ao login</Link>
               </p>
             </form>
           )}

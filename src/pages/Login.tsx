@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { TopClassLogo } from '@/components/TopClassLogo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,9 +30,9 @@ export default function LoginPage() {
     const success = await login(email, password)
     if (success) {
       toast.success('Login realizado com sucesso!')
-      navigate('/dashboard')
+      navigate('/dashboard', { replace: true })
     } else {
-      toast.error('Credenciais inválidas ou usuário inativo')
+      toast.error('E-mail ou senha incorretos.')
     }
   }
 
@@ -77,9 +77,9 @@ export default function LoginPage() {
             </Button>
 
             <p className="text-center">
-              <a href="/recuperar-senha" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <Link to="/recuperar-senha" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Esqueci minha senha
-              </a>
+              </Link>
             </p>
           </form>
         </CardContent>

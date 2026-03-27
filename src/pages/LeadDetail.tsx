@@ -18,6 +18,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
 import { supabase } from '@/integrations/supabase/client'
+import { calculateValorLiquido, inactivateLead as inactivateLeadService } from '@/services/pipeline'
 import {
   LEAD_ORIGEM_LABELS, LEAD_NECESSIDADE_LABELS, SERVICO_LABELS, MOTIVO_PERDA_LABELS,
   type Lead, type LeadOrigem, type LeadNecessidade, type ServicoInteresse, type MotivoPerdaTipo, type StatusFinanceiro,
@@ -102,9 +103,9 @@ export default function LeadDetailPage() {
       if (!prev) return prev
       const updated = { ...prev, [field]: value }
       if (field === 'valor_bruto' || field === 'porcentagem_desconto') {
-        const bruto = field === 'valor_bruto' ? (value as number) : (prev.valor_bruto || 0)
-        const desc = field === 'porcentagem_desconto' ? (value as number) : (prev.porcentagem_desconto || 0)
-        updated.valor_liquido = bruto * (1 - (desc || 0) / 100)
+        const bruto = field === 'valor_bruto' ? (value as number | null) : prev.valor_bruto
+        const desc = field === 'porcentagem_desconto' ? (value as number | null) : prev.porcentagem_desconto
+        updated.valor_liquido = calculateValorLiquido(bruto, desc)
       }
       return updated
     })
@@ -264,9 +265,13 @@ export default function LeadDetailPage() {
             )}
             {canInactivate && (
               <Button variant="outline" className="border-muted-foreground text-muted-foreground" onClick={async () => {
-                await supabase.from('leads').update({ status: 'inativo' }).eq('id', lead.id)
-                setLead(p => p ? { ...p, status: 'inativo' } : p)
-                toast.success('Cliente inativado')
+                try {
+                  const updated = await inactivateLeadService(lead)
+                  setLead(updated)
+                  toast.success('Cliente inativado')
+                } catch (err) {
+                  toast.error(`Erro ao inativar: ${(err as Error).message}`)
+                }
               }}>
                 <UserX className="mr-2 h-4 w-4" /> Inativar
               </Button>
