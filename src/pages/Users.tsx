@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
@@ -8,42 +8,56 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { mockPerfis } from '@/data/mockData'
+import { supabase } from '@/integrations/supabase/client'
 import type { Perfil, Role } from '@/types'
 import { Plus, Send, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<Perfil[]>(mockPerfis)
+  const [users, setUsers] = useState<Perfil[]>([])
+  const [loading, setLoading] = useState(true)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Role>('consultor')
   const [saving, setSaving] = useState(false)
 
-  const toggleStatus = (id: string) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, status: u.status === 'ativo' ? 'inativo' : 'ativo' } : u))
+  useEffect(() => {
+    async function fetchUsers() {
+      setLoading(true)
+      const { data } = await supabase.from('perfis').select('*').order('created_at', { ascending: false })
+      setUsers((data as Perfil[]) || [])
+      setLoading(false)
+    }
+    fetchUsers()
+  }, [])
+
+  const toggleStatus = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'ativo' ? 'inativo' : 'ativo'
+    const { error } = await supabase.from('perfis').update({ status: newStatus }).eq('id', id)
+    if (error) {
+      toast.error('Erro ao atualizar status')
+      return
+    }
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, status: newStatus as 'ativo' | 'inativo' } : u))
     toast.success('Status atualizado!')
   }
 
   const handleInvite = async () => {
     setSaving(true)
-    // TODO: Substituir por supabase.auth.admin.inviteUserByEmail(email) + insert perfis
-    await new Promise(r => setTimeout(r, 800))
-    const newUser: Perfil = {
-      id: `usr-${Date.now()}`,
-      nome_completo: nome,
-      email,
-      role,
-      status: 'ativo',
-      ultimo_acesso: null,
-      created_at: new Date().toISOString(),
-    }
-    setUsers(prev => [...prev, newUser])
+    // Use Supabase Auth admin invite (requires service role — for now show info)
+    toast.info('Para convidar usuários, use o painel do Supabase Auth ou configure uma Edge Function de convite.')
     setSaving(false)
     setInviteOpen(false)
     setNome(''); setEmail(''); setRole('consultor')
-    toast.success('Convite enviado com sucesso!')
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
@@ -87,7 +101,7 @@ export default function UsersPage() {
                   <td className="py-3 px-4 text-sm text-muted-foreground">{u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleDateString('pt-BR') : 'Nunca'}</td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-2">
-                      <Switch checked={u.status === 'ativo'} onCheckedChange={() => toggleStatus(u.id)} />
+                      <Switch checked={u.status === 'ativo'} onCheckedChange={() => toggleStatus(u.id, u.status)} />
                       {!u.ultimo_acesso && (
                         <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary" onClick={() => toast.success('Convite reenviado!')}>
                           <Send className="h-4 w-4" />
