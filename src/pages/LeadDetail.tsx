@@ -43,6 +43,7 @@ export default function LeadDetailPage() {
   const [newNote, setNewNote] = useState('')
   const [isPJ, setIsPJ] = useState(!!(originalLead?.cnpj))
   const [socios, setSocios] = useState(originalLead?.socios || [])
+  const [uploadedFiles, setUploadedFiles] = useState<{ file: File; nome_descricao: string }[]>([])
 
   // Sections
   const [openSections, setOpenSections] = useState({ basico: true, negociacao: true, contratual: true, docs: true, financeiro: true, historico: true })
