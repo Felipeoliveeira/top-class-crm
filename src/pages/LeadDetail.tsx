@@ -92,7 +92,9 @@ export default function LeadDetailPage() {
       if (!lead.cpf) missing.push('CPF')
       if (isPJ && !lead.cnpj) missing.push('CNPJ')
       if (isPJ && !lead.razao_social) missing.push('Razão Social')
-      if (documentos.length === 0) missing.push('Ao menos 1 documento enviado')
+      const totalDocs = documentos.length + uploadedFiles.length
+      if (totalDocs === 0) missing.push('Ao menos 1 documento enviado')
+      if (uploadedFiles.some(f => !f.nome_descricao.trim())) missing.push('Descrição obrigatória em todos os documentos anexados')
       if (lead.status_financeiro !== 'pago') {
         setBlockingFields(['Confirme o pagamento antes de fechar este lead.'])
         setBlockingMsg('O status financeiro deve estar como "Pago" para avançar.')
