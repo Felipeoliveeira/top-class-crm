@@ -126,7 +126,7 @@ export async function fetchActiveConsultores(): Promise<Perfil[]> {
   const { data, error } = await supabase
     .from('perfis')
     .select('id, nome_completo, email, role, status, ultimo_acesso, created_at')
-    .eq('role', 'consultor')
+    .in('role', ['consultor', 'admin'])
     .eq('status', 'ativo')
     .order('nome_completo')
 

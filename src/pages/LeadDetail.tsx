@@ -69,7 +69,7 @@ export default function LeadDetailPage() {
       const [historicoRes, docsRes, consultoresRes] = await Promise.all([
         supabase.from('historico_interacoes').select('*').eq('lead_id', Number(id)).order('created_at', { ascending: false }),
         supabase.from('documentos_lead').select('*').eq('lead_id', Number(id)),
-        supabase.from('perfis').select('*').eq('role', 'consultor').eq('status', 'ativo'),
+        supabase.from('perfis').select('*').in('role', ['consultor', 'admin']).eq('status', 'ativo'),
       ])
 
       // Fetch author names for historico
@@ -314,17 +314,19 @@ export default function LeadDetailPage() {
                 </SelectContent>
               </Select>
             </div>
-            {canAssignConsultor && (
-              <div className="space-y-2">
-                <Label className="text-foreground">Consultor</Label>
+            <div className="space-y-2">
+              <Label className="text-foreground">Responsável</Label>
+              {canAssignConsultor ? (
                 <Select value={lead.consultor_id} onValueChange={v => updateField('consultor_id', v)}>
                   <SelectTrigger className="bg-background border-border text-foreground"><SelectValue /></SelectTrigger>
                   <SelectContent className="bg-card border-border">
                     {consultores.map(c => <SelectItem key={c.id} value={c.id} className="text-foreground focus:bg-surface-elevated">{c.nome_completo}</SelectItem>)}
                   </SelectContent>
                 </Select>
-              </div>
-            )}
+              ) : (
+                <Input value={user?.nome_completo || ''} readOnly className="bg-background border-border text-muted-foreground" />
+              )}
+            </div>
             <div className="space-y-2">
               <Label className="text-muted-foreground">Data de Cadastro</Label>
               <Input value={new Date(lead.created_at).toLocaleDateString('pt-BR')} readOnly className="bg-background border-border text-muted-foreground" />
