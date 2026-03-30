@@ -26,23 +26,39 @@ async function throwIfInviteFailed(
   // `@supabase/functions-js` retorna `data: null` e coloca o corpo real em `error.context` (Response)
   // quando a função edge responde com 4xx/5xx. Em algumas bundling/casos, `instanceof` pode falhar,
   // então vamos usar detecção estrutural e tentar ler o corpo como texto.
-  const ctx = (result.error as FunctionsHttpError | any | undefined)?.context
+  const ctx = (result.error as { context?: unknown } | undefined)?.context
   if (ctx) {
+    let text: string | null = null
+    const responseLike = ctx as {
+      text?: () => Promise<string>
+      json?: () => Promise<InviteFunctionBody>
+    }
+
+    // 1) Tenta ler como texto (funciona para JSON e também para mensagens simples).
     try {
-      if (typeof ctx.text === 'function') {
-        const text = await ctx.text()
-        if (text) {
-          try {
-            const parsed = JSON.parse(text) as InviteFunctionBody
-            if (parsed?.error) throw new Error(parsed.error)
-            if (parsed?.message) throw new Error(parsed.message)
-          } catch {
-            // Se não for JSON, usa o texto cru como mensagem
-            throw new Error(text)
-          }
-        }
-      } else if (typeof ctx.json === 'function') {
-        const parsed = (await ctx.json()) as InviteFunctionBody
+      if (typeof responseLike.text === 'function') {
+        text = await responseLike.text()
+      }
+    } catch {
+      // tenta JSON abaixo
+    }
+
+    // 2) Se conseguiu texto, tenta parsear como JSON { error, message }.
+    if (typeof text === 'string') {
+      try {
+        const parsed = JSON.parse(text) as InviteFunctionBody
+        if (parsed?.error) throw new Error(parsed.error)
+        if (parsed?.message) throw new Error(parsed.message)
+      } catch {
+        // Se não for JSON, usa o texto cru como mensagem (mesmo que seja HTML curto)
+        if (text.trim()) throw new Error(text)
+      }
+    }
+
+    // 3) Se não deu para ler/parsear como texto, tenta ctx.json().
+    try {
+      if (typeof responseLike.json === 'function') {
+        const parsed = await responseLike.json()
         if (parsed?.error) throw new Error(parsed.error)
         if (parsed?.message) throw new Error(parsed.message)
       }
@@ -51,7 +67,7 @@ async function throwIfInviteFailed(
     }
   }
 
-  throw new Error((result.error as any).message ?? fallback)
+  throw new Error(((result.error as { message?: string } | undefined)?.message ?? fallback))
 }
 
 export async function fetchPerfisForAdmin(): Promise<Perfil[]> {
@@ -70,13 +86,14 @@ export async function invokeInviteUser(payload: InviteUserPayload): Promise<void
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Sessão expirada. Faça login novamente.')
 
+  // Não enviar Authorization manualmente: o fetch do SupabaseClient (fetchWithAuth)
+  // injeta Bearer a partir da sessão; header duplicado/errado pode gerar 401 Invalid JWT no gateway.
   const response = await supabase.functions.invoke('invite-user', {
     body: {
       email: payload.email.trim().toLowerCase(),
       nome_completo: payload.nome_completo.trim(),
       role: payload.role,
     },
-    headers: { Authorization: `Bearer ${session.access_token}` },
   })
 
   await throwIfInviteFailed(response, 'Erro ao enviar convite')
@@ -88,7 +105,6 @@ export async function invokeResendInvite(email: string): Promise<void> {
 
   const response = await supabase.functions.invoke('invite-user', {
     body: { resend: true, email: email.trim().toLowerCase() },
-    headers: { Authorization: `Bearer ${session.access_token}` },
   })
 
   await throwIfInviteFailed(response, 'Erro ao reenviar convite')
