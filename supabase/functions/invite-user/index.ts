@@ -16,6 +16,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 
     // Verificar se o usuário chamador é admin
     const authHeader = req.headers.get('Authorization')
@@ -26,20 +27,26 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Parse do Authorization: aceita tanto "Bearer <token>" quanto apenas "<token>".
-    // O Supabase Edge Runtime valida o JWT, mas algumas variações de header podem quebrar o parse simples.
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim()
-    if (!token) {
-      return new Response(JSON.stringify({ error: 'Authorization header sem token' }), {
-        status: 401,
+    if (!supabaseAnonKey) {
+      return new Response(JSON.stringify({ error: 'SUPABASE_ANON_KEY ausente na Edge Function' }), {
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const { data: { user: caller }, error: callerError } = await supabaseAdmin.auth.getUser(token)
+    const supabaseCaller = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      supabaseAnonKey,
+      {
+        global: { headers: { Authorization: authHeader } },
+        auth: { autoRefreshToken: false, persistSession: false },
+      }
+    )
 
+    const { data: { user: caller }, error: callerError } = await supabaseCaller.auth.getUser()
     if (callerError || !caller) {
-      return new Response(JSON.stringify({ error: 'Token inválido' }), {
+      const callerMessage = callerError?.message ?? 'Token inválido'
+      return new Response(JSON.stringify({ error: callerMessage }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
