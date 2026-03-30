@@ -59,9 +59,26 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Enviar convite via Supabase Auth Admin
+    const frontendBase = (Deno.env.get('FRONTEND_URL') ?? '').replace(/\/$/, '')
+    if (!frontendBase) {
+      return new Response(
+        JSON.stringify({
+          error:
+            'FRONTEND_URL não configurada na Edge Function. Defina o secret (ex.: https://app.seudominio.com ou http://localhost:8080).',
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
+    const redirectTo = `${frontendBase}/definir-senha`
+
+    // Enviar convite via Supabase Auth Admin (redirect alinha convite à mesma rota que recuperação de senha — RF-04)
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: { nome_completo, role },
+      redirectTo,
     })
 
     if (inviteError) {
