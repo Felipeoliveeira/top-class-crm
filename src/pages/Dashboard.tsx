@@ -1,18 +1,15 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { KpiCard } from '@/components/KpiCard'
-import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
-import { supabase } from '@/integrations/supabase/client'
-import { LEAD_ORIGEM_LABELS, SERVICO_LABELS } from '@/types'
-import type { LeadOrigem, Lead, Perfil } from '@/types'
+import { useDashboardCharts, useDashboardKpis, useConsultoresPerformanceTable } from '@/hooks/useDashboard'
+import { computeConsultorPerformance } from '@/services/dashboard'
+import type { TimeFilter } from '@/services/dashboard'
 import { Users, TrendingUp, CheckCircle, DollarSign, XCircle, TrendingDown, Percent, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts'
 import { toast } from 'sonner'
-
-type TimeFilter = 'hoje' | '7dias' | '30dias' | 'total'
 
 const filterLabels: Record<TimeFilter, string> = {
   hoje: 'Hoje',
@@ -28,97 +25,31 @@ const origemColors: Record<string, string> = {
   rede_social: '#16A34A',
 }
 
-function getDateFilter(filter: TimeFilter): string | null {
-  const now = new Date()
-  if (filter === 'hoje') return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-  if (filter === '7dias') { now.setDate(now.getDate() - 7); return now.toISOString() }
-  if (filter === '30dias') { now.setDate(now.getDate() - 30); return now.toISOString() }
-  return null
-}
-
 export default function DashboardPage() {
-  const { user } = useAuth()
   const { canViewAllDashboard, canViewFinancialKpis, canViewPerformanceTable } = usePermissions()
   const [filter, setFilter] = useState<TimeFilter>('30dias')
-  const [leads, setLeads] = useState<Lead[]>([])
-  const [consultores, setConsultores] = useState<Perfil[]>([])
-  const [loading, setLoading] = useState(true)
+
+  const { kpis, isLoading: loadingKpis, isError, error } = useDashboardKpis(filter)
+  const { charts, leads } = useDashboardCharts(filter)
+
+  const { data: consultores = [], isLoading: loadingConsultores } = useConsultoresPerformanceTable(
+    canViewPerformanceTable,
+  )
+
+  const performanceRows = useMemo(
+    () => (canViewPerformanceTable ? computeConsultorPerformance(leads, consultores) : []),
+    [leads, consultores, canViewPerformanceTable],
+  )
 
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
-      try {
-        let query = supabase.from('leads').select('*')
-        const dateFilter = getDateFilter(filter)
-        if (dateFilter) query = query.gte('created_at', dateFilter)
-
-        const { data: leadsData, error: leadsError } = await query
-        if (leadsError) throw leadsError
-        setLeads((leadsData as Lead[]) || [])
-
-        if (canViewPerformanceTable) {
-          const { data: perfisData, error: perfisError } = await supabase
-            .from('perfis')
-            .select('*')
-            .eq('role', 'consultor')
-            .eq('status', 'ativo')
-          if (perfisError) throw perfisError
-          setConsultores((perfisData as Perfil[]) || [])
-        } else {
-          setConsultores([])
-        }
-      } catch (error) {
-        setLeads([])
-        setConsultores([])
-        toast.error(`Erro ao carregar dashboard: ${(error as Error).message}`)
-      } finally {
-        setLoading(false)
-      }
+    if (isError && error) {
+      toast.error(`Erro ao carregar dashboard: ${(error as Error).message}`)
     }
-    fetchData()
-  }, [filter, canViewPerformanceTable])
+  }, [isError, error])
 
-  const totalLeads = leads.length
-  const fechados = leads.filter(l => l.status === 'fechado')
-  const perdidos = leads.filter(l => l.status === 'perdido')
-  const conversionRate = totalLeads > 0 ? Math.round((fechados.length / Math.max(totalLeads - perdidos.length, 1)) * 100) : 0
-  const valorGanho = fechados.filter(l => l.status_financeiro === 'pago').reduce((sum, l) => sum + (l.valor_liquido || 0), 0)
-  const valorPerdido = perdidos.reduce((sum, l) => sum + (l.valor_bruto || 0), 0)
-  const totalDescontos = fechados.reduce((sum, l) => sum + ((l.valor_bruto || 0) - (l.valor_liquido || 0)), 0)
+  const loading = loadingKpis || (canViewPerformanceTable && loadingConsultores)
 
-  const origemData = (['indicacao', 'google', 'placa', 'rede_social'] as LeadOrigem[]).map(o => ({
-    name: LEAD_ORIGEM_LABELS[o],
-    value: leads.filter(l => l.origem === o).length,
-    key: o,
-  }))
-
-  const clientesOrigemData = (['indicacao', 'google', 'placa', 'rede_social'] as LeadOrigem[]).map(o => ({
-    name: LEAD_ORIGEM_LABELS[o],
-    value: fechados.filter(l => l.origem === o).length,
-    key: o,
-  }))
-
-  const servicoData = Object.entries(SERVICO_LABELS).map(([key, label]) => ({
-    name: label,
-    value: leads.filter(l => l.servico_interesse === key).length,
-  })).sort((a, b) => b.value - a.value)
-
-  const clientesServicoData = Object.entries(SERVICO_LABELS).map(([key, label]) => ({
-    name: label,
-    value: fechados.filter(l => l.servico_interesse === key).length,
-  })).sort((a, b) => b.value - a.value)
-
-  // Daily data from actual leads
-  const dailyData = useMemo(() => {
-    const days: Record<string, { leads: number; ganhos: number }> = {}
-    leads.forEach(l => {
-      const d = l.created_at.split('T')[0]
-      if (!days[d]) days[d] = { leads: 0, ganhos: 0 }
-      days[d].leads++
-      if (l.status === 'fechado') days[d].ganhos++
-    })
-    return Object.entries(days).sort(([a], [b]) => a.localeCompare(b)).map(([date, v]) => ({ date, ...v }))
-  }, [leads])
+  const { daily: dailyData, origem: origemData, clientesOrigem: clientesOrigemData, servico: servicoData, clientesServico: clientesServicoData } = charts
 
   if (loading) {
     return (
@@ -132,11 +63,11 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader title="Dashboard" subtitle={canViewAllDashboard ? 'Visão geral do time comercial' : 'Meus resultados'} />
 
-      {/* Time filter */}
       <div className="flex gap-2">
         {(Object.keys(filterLabels) as TimeFilter[]).map(f => (
           <button
             key={f}
+            type="button"
             onClick={() => setFilter(f)}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${f === filter ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-surface-elevated'}`}
           >
@@ -145,28 +76,45 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* KPI Row 1 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard title="Leads Totais" value={totalLeads} icon={Users} />
-        <KpiCard title="Taxa de Conversão" value={`${conversionRate}%`} icon={TrendingUp} />
-        <KpiCard title="Negócios Ganhos" value={fechados.length} icon={CheckCircle} iconColor="text-success" />
+        <KpiCard title="Leads Totais" value={kpis.totalLeads} icon={Users} />
+        <KpiCard title="Taxa de Conversão" value={`${kpis.conversionRate}%`} icon={TrendingUp} />
+        <KpiCard
+          title={canViewFinancialKpis ? 'Negócios Ganhos' : 'Negócios Fechados'}
+          value={kpis.negociosGanhos}
+          icon={CheckCircle}
+          iconColor="text-success"
+        />
         {canViewFinancialKpis ? (
-          <KpiCard title="Valor Total Ganho" value={`R$ ${valorGanho.toLocaleString('pt-BR')}`} icon={DollarSign} iconColor="text-success" />
+          <KpiCard
+            title="Valor Total Ganho"
+            value={`R$ ${kpis.valorGanho.toLocaleString('pt-BR')}`}
+            icon={DollarSign}
+            iconColor="text-success"
+          />
         ) : (
-          <KpiCard title="Negócios Perdidos" value={perdidos.length} icon={XCircle} iconColor="text-destructive" />
+          <KpiCard title="Negócios Perdidos" value={kpis.negociosPerdidos} icon={XCircle} iconColor="text-destructive" />
         )}
       </div>
 
-      {/* KPI Row 2 - Admin only */}
       {canViewFinancialKpis && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <KpiCard title="Negócios Perdidos" value={perdidos.length} icon={XCircle} iconColor="text-destructive" />
-          <KpiCard title="Valor Perdido" value={`R$ ${valorPerdido.toLocaleString('pt-BR')}`} icon={TrendingDown} iconColor="text-destructive" />
-          <KpiCard title="Total Descontos" value={`R$ ${totalDescontos.toLocaleString('pt-BR')}`} icon={Percent} iconColor="text-warning" />
+          <KpiCard title="Negócios Perdidos" value={kpis.negociosPerdidos} icon={XCircle} iconColor="text-destructive" />
+          <KpiCard
+            title="Valor Perdido"
+            value={`R$ ${kpis.valorPerdido.toLocaleString('pt-BR')}`}
+            icon={TrendingDown}
+            iconColor="text-destructive"
+          />
+          <KpiCard
+            title="Total Descontos"
+            value={`R$ ${kpis.totalDescontos.toLocaleString('pt-BR')}`}
+            icon={Percent}
+            iconColor="text-warning"
+          />
         </div>
       )}
 
-      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
         <Card className="lg:col-span-2 border-border bg-card">
           <CardHeader>
@@ -198,7 +146,7 @@ export default function DashboardPage() {
                 <YAxis tick={{ fill: '#94A3B8', fontSize: 11 }} />
                 <Tooltip contentStyle={{ background: '#1A2438', border: '1px solid #2D3F57', borderRadius: 8, color: '#F1F5F9' }} formatter={(value: number) => [<span style={{ color: '#C50B40', fontWeight: 600 }}>{value}</span>, 'Leads']} />
                 <Bar dataKey="value" name="Leads" radius={[4, 4, 0, 0]}>
-                  {origemData.map((entry) => (
+                  {origemData.map(entry => (
                     <Cell key={entry.key} fill={origemColors[entry.key]} />
                   ))}
                 </Bar>
@@ -219,7 +167,7 @@ export default function DashboardPage() {
                 <YAxis tick={{ fill: '#94A3B8', fontSize: 11 }} />
                 <Tooltip contentStyle={{ background: '#1A2438', border: '1px solid #2D3F57', borderRadius: 8, color: '#F1F5F9' }} formatter={(value: number) => [<span style={{ color: '#C50B40', fontWeight: 600 }}>{value}</span>, 'Clientes']} />
                 <Bar dataKey="value" name="Clientes" radius={[4, 4, 0, 0]}>
-                  {clientesOrigemData.map((entry) => (
+                  {clientesOrigemData.map(entry => (
                     <Cell key={entry.key} fill={origemColors[entry.key]} />
                   ))}
                 </Bar>
@@ -229,7 +177,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Leads por Plano/Serviço + Clientes por Plano/Serviço */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="border-border bg-card">
           <CardHeader>
@@ -276,7 +223,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Performance table - Admin only */}
       {canViewPerformanceTable && (
         <Card className="border-border bg-card">
           <CardHeader>
@@ -295,28 +241,24 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {consultores.map(c => {
-                    const cLeads = leads.filter(l => l.consultor_id === c.id)
-                    const cFechados = cLeads.filter(l => l.status === 'fechado')
-                    const cPerdidos = cLeads.filter(l => l.status === 'perdido')
-                    const cConv = cLeads.length > 0 ? Math.round((cFechados.length / Math.max(cLeads.length - cPerdidos.length, 1)) * 100) : 0
-                    const cValor = cFechados.filter(l => l.status_financeiro === 'pago').reduce((s, l) => s + (l.valor_liquido || 0), 0)
-                    const initials = c.nome_completo.split(' ').map(n => n[0]).join('').slice(0, 2)
-                    return (
-                      <tr key={c.id} className="border-b border-border/50 hover:bg-surface-elevated transition-colors">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8"><AvatarFallback className="bg-primary/20 text-primary text-xs">{initials}</AvatarFallback></Avatar>
-                            <span className="text-sm text-foreground">{c.nome_completo}</span>
-                          </div>
-                        </td>
-                        <td className="text-center py-3 px-4 text-sm text-foreground">{cLeads.length}</td>
-                        <td className="text-center py-3 px-4 text-sm text-foreground">{cFechados.length}</td>
-                        <td className="text-center py-3 px-4 text-sm text-foreground">{cConv}%</td>
-                        <td className="text-right py-3 px-4 text-sm font-medium text-foreground">R$ {cValor.toLocaleString('pt-BR')}</td>
-                      </tr>
-                    )
-                  })}
+                  {performanceRows.map(row => (
+                    <tr key={row.perfil.id} className="border-b border-border/50 hover:bg-surface-elevated transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-primary/20 text-primary text-xs">{row.initials}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm text-foreground">{row.perfil.nome_completo}</span>
+                        </div>
+                      </td>
+                      <td className="text-center py-3 px-4 text-sm text-foreground">{row.totalLeads}</td>
+                      <td className="text-center py-3 px-4 text-sm text-foreground">{row.ganhos}</td>
+                      <td className="text-center py-3 px-4 text-sm text-foreground">{row.conversaoPct}%</td>
+                      <td className="text-right py-3 px-4 text-sm font-medium text-foreground">
+                        R$ {row.valorGanho.toLocaleString('pt-BR')}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

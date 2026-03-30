@@ -24,6 +24,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
 import { PIPELINE_QUERY_KEYS } from '@/hooks/usePipeline'
+import { invalidateDashboardQueries } from '@/hooks/useDashboard'
 import { usePermissions } from '@/hooks/usePermissions'
 import { supabase } from '@/integrations/supabase/client'
 import { calculateValorLiquido, inactivateLead as inactivateLeadService } from '@/services/pipeline'
@@ -104,6 +105,7 @@ export default function LeadDetailPage() {
   const invalidateLeadsQueries = () => {
     queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
     queryClient.invalidateQueries({ queryKey: ['leads'] })
+    invalidateDashboardQueries(queryClient)
   }
 
   useEffect(() => {
