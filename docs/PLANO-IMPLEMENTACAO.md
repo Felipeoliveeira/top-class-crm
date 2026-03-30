@@ -252,9 +252,13 @@ src/
 | ID | User Story | Critério de Aceite | RFs / USs |
 |----|------------|-------------------|-----------|
 | **S-6.1.1** | Como Admin, quero ver a listagem de usuários com Nome, E-mail, Role, Status, Último Acesso e Ações | Tabela em `/admin/usuarios`. Inativos com badge e opacidade reduzida | US-35, RF-31 |
-| **S-6.1.2** | Como Admin, quero cadastrar usuários (Nome, E-mail, Role) e enviar convite por e-mail automaticamente | Modal de cadastro. Chama Edge Function `invite-user` (já existente). Link expira em 24h | US-32, RF-32 |
+| **S-6.1.2** | Como Admin, quero cadastrar usuários (Nome, E-mail, Role) e enviar convite por e-mail automaticamente | Modal de cadastro. Chama Edge Function `invite-user` (já existente) com `redirectTo` para `/definir-senha`. Link expira em 24h. O link do e-mail de convite abre o SPA em `/definir-senha` (SetPassword): sessão via hash, título “Crie sua senha”, alinhado a RF-04 e S-2.1.4 | US-32, RF-32 |
 | **S-6.1.3** | Como Admin, quero ativar/desativar consultores sem perder dados | Toggle na tabela. Desativar → `status = 'inativo'` → sessão invalidada. Reativar → `status = 'ativo'` | US-33, RF-33 |
-| **S-6.1.4** | Como Admin, quero reenviar convite de primeiro acesso quando o link expirar | Botão visível apenas quando o usuário não completou primeiro acesso. Reenvia com novo link de 24h | US-34, RF-34 |
+| **S-6.1.4** | Como Admin, quero reenviar convite de primeiro acesso quando o link expirar | Botão visível apenas quando o usuário não completou primeiro acesso. Reenvia com novo link de 24h para o mesmo destino `/definir-senha` | US-34, RF-34 |
+
+**Fluxo de primeiro acesso (convite):** Admin cadastra → e-mail enviado pelo Auth → usuário abre o link → `/definir-senha` (define senha) → após sucesso, redirect para `/login` conforme RF-04.
+
+A Edge Function `invite-user` monta `redirectTo` a partir da variável **`FRONTEND_URL`** (URL base do SPA, sem barra final; ex.: `http://localhost:8080` em dev). Configurar como secret do projeto Supabase (Dashboard → Edge Functions → Secrets ou `supabase secrets set FRONTEND_URL=...`).
 
 ---
 
@@ -315,7 +319,7 @@ src/
 |----|------|-------------------|
 | **S-8.3.1** | Audit de segurança: verificar que todas as tabelas têm RLS ativo, sem chaves hardcoded no frontend | Zero segredos no código. `supabase/client.ts` usa `import.meta.env` em vez de valores hardcoded |
 | **S-8.3.2** | Configurar domínio customizado na Vercel + SSL | HTTPS ativo. Redirect HTTP → HTTPS |
-| **S-8.3.3** | Configurar Supabase Auth redirect URLs para domínio de produção | Links de convite e recuperação apontam para o domínio correto |
+| **S-8.3.3** | Configurar Supabase Auth redirect URLs para domínio de produção | Links de convite (`invite-user` → `redirectTo`) e recuperação (`resetPasswordForEmail`) apontam para o domínio correto. Incluir na allowlist **Redirect URLs** a URL completa `https://<domínio>/definir-senha` (e equivalentes local/staging, ex.: `http://localhost:8080/definir-senha`), não apenas a raiz do site |
 | **S-8.3.4** | Criar usuário Admin inicial (seed) no Supabase | Admin pode acessar o sistema e criar os primeiros consultores |
 | **S-8.3.5** | Testar fluxo completo em produção: login → criar lead → avançar pipeline → fechar | Smoke test manual end-to-end no ambiente de produção |
 | **S-8.3.6** | Documentar runbook de operação (backup, rollback, monitoramento) | `docs/runbook.md` com procedimentos de emergência |
