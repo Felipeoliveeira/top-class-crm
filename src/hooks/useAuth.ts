@@ -18,6 +18,7 @@ interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
   initialized: boolean
+  hasExplicitLogin: boolean
   login: (email: string, password: string) => Promise<boolean>
   logout: () => Promise<void>
   initialize: () => Promise<void>
@@ -42,39 +43,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isLoading: false,
   initialized: false,
+  hasExplicitLogin: false,
 
   initialize: async () => {
     if (get().initialized) return
 
     const { data: { session } } = await supabase.auth.getSession()
     if (session?.user) {
-      const perfil = await fetchPerfil(session.user.id)
-      if (perfil && perfil.status === 'ativo') {
-        set({ user: perfil, supabaseUser: session.user, isAuthenticated: true, initialized: true })
-      } else {
-        if (session) await supabase.auth.signOut()
-        set({ initialized: true })
-      }
-    } else {
-      set({ initialized: true })
+      // Hardening: nunca reaproveitar sessão pré-existente ao abrir o CRM.
+      // O usuário deve autenticar explicitamente com e-mail e senha.
+      await supabase.auth.signOut()
     }
+    set({ user: null, supabaseUser: null, isAuthenticated: false, initialized: true, hasExplicitLogin: false })
 
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session?.user) {
-        set({ user: null, supabaseUser: null, isAuthenticated: false })
+        set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false })
         return
       }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (!get().hasExplicitLogin) {
+          await supabase.auth.signOut()
+          set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false })
+          return
+        }
         const perfil = await fetchPerfil(session.user.id)
         if (perfil && perfil.status === 'ativo') {
           set({ user: perfil, supabaseUser: session.user, isAuthenticated: true })
+        } else {
+          await supabase.auth.signOut()
+          set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false })
         }
       }
     })
   },
 
   login: async (email: string, password: string) => {
-    set({ isLoading: true })
+    set({ isLoading: true, hasExplicitLogin: true })
     const start = Date.now()
     let success = false
 
@@ -87,10 +92,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           success = true
         } else {
           await supabase.auth.signOut()
+          set({ hasExplicitLogin: false })
         }
       }
     } catch {
       // Network/unexpected errors swallowed to prevent info leakage
+      set({ hasExplicitLogin: false })
     }
 
     // Tempo mínimo de resposta impede inferência por timing (S-2.1.1)
@@ -99,13 +106,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await new Promise(resolve => setTimeout(resolve, MIN_LOGIN_DELAY_MS - elapsed))
     }
 
+    if (!success) {
+      set({ hasExplicitLogin: false })
+    }
     set({ isLoading: false })
     return success
   },
 
   logout: async () => {
     await supabase.auth.signOut()
-    set({ user: null, supabaseUser: null, isAuthenticated: false })
+    set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false })
   },
 
   checkActiveStatus: async () => {
@@ -115,7 +125,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const perfil = await fetchPerfil(currentUser.id)
     if (!perfil || perfil.status !== 'ativo') {
       await supabase.auth.signOut()
-      set({ user: null, supabaseUser: null, isAuthenticated: false })
+      set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false })
     } else {
       set({ user: perfil })
     }

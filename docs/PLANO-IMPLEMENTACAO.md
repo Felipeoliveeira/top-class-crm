@@ -136,7 +136,7 @@ src/
 | ID | User Story | Critério de Aceite | RFs / USs |
 |----|------------|-------------------|-----------|
 | **S-3.2.1** | Como Consultor, quero cadastrar um lead preenchendo apenas nome e telefone | Modal "+ Novo Lead" com validação zod. Campos: nome (obrigatório), telefone (obrigatório). `consultor_id` automático | US-06, RF-06 |
-| **S-3.2.2** | Como Admin, quero selecionar o consultor responsável ao cadastrar um lead | Dropdown de consultores ativos visível apenas para Admin | US-07, RF-06 |
+| **S-3.2.2** | Como Admin, quero selecionar o responsável ao cadastrar um lead | Dropdown de usuários ativos com role `consultor` **ou** `admin`, visível apenas para Admin | US-07, RF-06 |
 | **S-3.2.3** | Como sistema, quero que o lead entre em Atendimento e apareça no Kanban imediatamente | Insert com `status = 'atendimento'`. Invalidação de cache TanStack Query. Trigger registra em `pipeline_logs` | RF-06 |
 
 ### Epic 3.3 — Validação de Gates (Regras de Progressão)

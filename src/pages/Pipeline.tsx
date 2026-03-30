@@ -452,7 +452,7 @@ export default function PipelinePage() {
             </div>
             {canAssignConsultor && (
               <div className="space-y-2">
-                <Label className="text-foreground">Consultor Responsável *</Label>
+                <Label className="text-foreground">Responsável *</Label>
                 <Select value={consultorId} onValueChange={setConsultorId}>
                   <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent className="bg-card border-border">
