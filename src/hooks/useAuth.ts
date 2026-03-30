@@ -105,7 +105,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (!error && data.user) {
         const perfil = await fetchPerfil(data.user.id)
         if (perfil && perfil.status === 'ativo') {
-          set({ user: perfil, supabaseUser: data.user, isAuthenticated: true })
+          let perfilFinal = perfil
+          try {
+            const { error: rpcErr } = await supabase.rpc('fn_atualizar_ultimo_acesso')
+            if (!rpcErr) {
+              const atualizado = await fetchPerfil(data.user.id)
+              if (atualizado) perfilFinal = atualizado
+            }
+          } catch {
+            // RPC ausente ou falha de rede: mantém perfil sem ultimo_acesso atualizado nesta sessão
+          }
+          set({
+            user: perfilFinal,
+            supabaseUser: data.user,
+            isAuthenticated: true,
+          })
           success = true
         } else {
           set({ hasExplicitLogin: false })

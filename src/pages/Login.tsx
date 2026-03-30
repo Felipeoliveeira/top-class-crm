@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { TopClassLogo } from '@/components/TopClassLogo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,10 +14,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const { login, isLoading, isAuthenticated, initialize, initialized } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     initialize()
   }, [initialize])
+
+  useEffect(() => {
+    const st = location.state as { fromPasswordSetup?: boolean } | null
+    if (st?.fromPasswordSetup) {
+      toast.success('Senha definida com sucesso! Faça login para continuar.')
+      navigate('/login', { replace: true, state: {} })
+    }
+  }, [location.state, navigate])
 
   useEffect(() => {
     if (initialized && isAuthenticated) {

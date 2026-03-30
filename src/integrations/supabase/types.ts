@@ -323,6 +323,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      fn_atualizar_ultimo_acesso: { Args: never; Returns: null }
       fn_get_role: { Args: never; Returns: string }
       fn_reatribuir_lead_consultor: {
         Args: { p_lead_id: number; p_novo_consultor_id: string }
