@@ -23,18 +23,35 @@ async function throwIfInviteFailed(
   }
   if (!result.error) return
 
-  if (result.error instanceof FunctionsHttpError && result.error.context) {
+  // `@supabase/functions-js` retorna `data: null` e coloca o corpo real em `error.context` (Response)
+  // quando a função edge responde com 4xx/5xx. Em algumas bundling/casos, `instanceof` pode falhar,
+  // então vamos usar detecção estrutural e tentar ler o corpo como texto.
+  const ctx = (result.error as FunctionsHttpError | any | undefined)?.context
+  if (ctx) {
     try {
-      const parsed = (await result.error.context.json()) as InviteFunctionBody
-      if (parsed?.error) throw new Error(parsed.error)
-    } catch (e) {
-      if (e instanceof Error && !(e instanceof SyntaxError)) {
-        throw e
+      if (typeof ctx.text === 'function') {
+        const text = await ctx.text()
+        if (text) {
+          try {
+            const parsed = JSON.parse(text) as InviteFunctionBody
+            if (parsed?.error) throw new Error(parsed.error)
+            if (parsed?.message) throw new Error(parsed.message)
+          } catch {
+            // Se não for JSON, usa o texto cru como mensagem
+            throw new Error(text)
+          }
+        }
+      } else if (typeof ctx.json === 'function') {
+        const parsed = (await ctx.json()) as InviteFunctionBody
+        if (parsed?.error) throw new Error(parsed.error)
+        if (parsed?.message) throw new Error(parsed.message)
       }
+    } catch {
+      // fallback abaixo
     }
   }
 
-  throw new Error(result.error.message ?? fallback)
+  throw new Error((result.error as any).message ?? fallback)
 }
 
 export async function fetchPerfisForAdmin(): Promise<Perfil[]> {
