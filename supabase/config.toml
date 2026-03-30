@@ -1,1 +1,6 @@
 project_id = "acskrawxepcvkgbegrpe"
+
+# O gateway das Edge Functions valida JWT antes do Deno; em alguns cenários (ex.: ES256 / mismatch de verificação)
+# isso retorna 401 "Invalid JWT" mesmo com sessão válida no REST. A função valida o chamador com service_role.
+[functions.invite-user]
+verify_jwt = false

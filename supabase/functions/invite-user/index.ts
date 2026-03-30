@@ -16,9 +16,8 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 
-    // Verificar se o usuário chamador é admin
+    // Autenticação do chamador: com verify_jwt=false no gateway, validamos aqui com service_role.
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Não autorizado' }), {
@@ -27,23 +26,15 @@ Deno.serve(async (req) => {
       })
     }
 
-    if (!supabaseAnonKey) {
-      return new Response(JSON.stringify({ error: 'SUPABASE_ANON_KEY ausente na Edge Function' }), {
-        status: 500,
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Authorization sem token' }), {
+        status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const supabaseCaller = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      supabaseAnonKey,
-      {
-        global: { headers: { Authorization: authHeader } },
-        auth: { autoRefreshToken: false, persistSession: false },
-      }
-    )
-
-    const { data: { user: caller }, error: callerError } = await supabaseCaller.auth.getUser()
+    const { data: { user: caller }, error: callerError } = await supabaseAdmin.auth.getUser(token)
     if (callerError || !caller) {
       const callerMessage = callerError?.message ?? 'Token inválido'
       return new Response(JSON.stringify({ error: callerMessage }), {
