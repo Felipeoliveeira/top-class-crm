@@ -198,6 +198,7 @@ src/
 |----|------------|-------------------|-----------|
 | **S-4.3.1** | Como Consultor, quero fazer upload de documentos com drag-and-drop e nome/descrição obrigatória | Área de upload. Formatos: DOC, DOCX, JPG, PDF. Limite: 10MB. Nome/descrição obrigatório | US-23, RF-19 |
 | **S-4.3.2** | Como Consultor, quero ver a lista de documentos com nome, formato, data e botão de download | Lista na seção Documentos. Download via signed URL do Supabase Storage | RF-19 |
+| **S-4.3.3** | Como usuário, quero baixar documentos anexados diretamente no detalhe do lead | Botão "Download" funcional por item na seção Documentos, com geração de signed URL e abertura segura do arquivo | RF-19 |
 
 ### Epic 4.4 — Histórico de Interações
 
