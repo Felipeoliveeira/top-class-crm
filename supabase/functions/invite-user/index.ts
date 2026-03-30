@@ -26,7 +26,16 @@ Deno.serve(async (req) => {
       })
     }
 
-    const token = authHeader.replace('Bearer ', '')
+    // Parse do Authorization: aceita tanto "Bearer <token>" quanto apenas "<token>".
+    // O Supabase Edge Runtime valida o JWT, mas algumas variações de header podem quebrar o parse simples.
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Authorization header sem token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const { data: { user: caller }, error: callerError } = await supabaseAdmin.auth.getUser(token)
 
     if (callerError || !caller) {
