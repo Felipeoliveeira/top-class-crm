@@ -10,6 +10,7 @@ import { Users, TrendingUp, CheckCircle, DollarSign, XCircle, TrendingDown, Perc
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts'
+import { toast } from 'sonner'
 
 type TimeFilter = 'hoje' | '7dias' | '30dias' | 'total'
 
@@ -46,22 +47,33 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchData() {
       setLoading(true)
-      let query = supabase.from('leads').select('*')
-      const dateFilter = getDateFilter(filter)
-      if (dateFilter) query = query.gte('created_at', dateFilter)
-      
-      const { data: leadsData } = await query
-      setLeads((leadsData as Lead[]) || [])
+      try {
+        let query = supabase.from('leads').select('*')
+        const dateFilter = getDateFilter(filter)
+        if (dateFilter) query = query.gte('created_at', dateFilter)
 
-      if (canViewPerformanceTable) {
-        const { data: perfisData } = await supabase
-          .from('perfis')
-          .select('*')
-          .eq('role', 'consultor')
-          .eq('status', 'ativo')
-        setConsultores((perfisData as Perfil[]) || [])
+        const { data: leadsData, error: leadsError } = await query
+        if (leadsError) throw leadsError
+        setLeads((leadsData as Lead[]) || [])
+
+        if (canViewPerformanceTable) {
+          const { data: perfisData, error: perfisError } = await supabase
+            .from('perfis')
+            .select('*')
+            .eq('role', 'consultor')
+            .eq('status', 'ativo')
+          if (perfisError) throw perfisError
+          setConsultores((perfisData as Perfil[]) || [])
+        } else {
+          setConsultores([])
+        }
+      } catch (error) {
+        setLeads([])
+        setConsultores([])
+        toast.error(`Erro ao carregar dashboard: ${(error as Error).message}`)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     fetchData()
   }, [filter, canViewPerformanceTable])

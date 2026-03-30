@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { supabase } from '@/integrations/supabase/client'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function RecoverPasswordPage() {
   const [email, setEmail] = useState('')
@@ -16,11 +17,19 @@ export default function RecoverPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/definir-senha`,
-    })
-    setLoading(false)
-    setSent(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/definir-senha`,
+      })
+      if (error) throw error
+      setSent(true)
+    } catch {
+      // Mantém mensagem genérica por segurança, sem revelar existência do e-mail.
+      setSent(true)
+      toast.error('Não foi possível enviar agora. Tente novamente em instantes.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

@@ -324,6 +324,10 @@ export type Database = {
     }
     Functions: {
       fn_get_role: { Args: never; Returns: string }
+      fn_reatribuir_lead_consultor: {
+        Args: { p_lead_id: number; p_novo_consultor_id: string }
+        Returns: Database["public"]["Tables"]["leads"]["Row"][]
+      }
     }
     Enums: {
       formato_doc_enum: "doc" | "docx" | "jpg" | "pdf"

@@ -86,11 +86,24 @@ export default function SetPasswordPage() {
     if (!isValid) return
 
     setLoading(true)
-    const { error } = await supabase.auth.updateUser({ password })
-    setLoading(false)
+    let errorMessage: string | null = null
+    try {
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) {
+        errorMessage = error.message
+      } else {
+        toast.success('Senha definida com sucesso!')
+        await supabase.auth.signOut()
+        navigate('/login')
+      }
+    } catch {
+      errorMessage = 'Erro ao definir senha. Tente novamente.'
+    } finally {
+      setLoading(false)
+    }
 
-    if (error) {
-      const msg = error.message?.toLowerCase() ?? ''
+    if (errorMessage) {
+      const msg = errorMessage.toLowerCase()
       if (msg.includes('expired') || msg.includes('invalid') || msg.includes('token')) {
         setPageState('expired')
       } else {
@@ -98,10 +111,6 @@ export default function SetPasswordPage() {
       }
       return
     }
-
-    toast.success('Senha definida com sucesso!')
-    await supabase.auth.signOut()
-    navigate('/login')
   }
 
   return (
