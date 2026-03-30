@@ -9,6 +9,10 @@ interface InviteFunctionBody {
   success?: boolean
 }
 
+interface JwtPayload {
+  exp?: number
+}
+
 /**
  * Em 4xx/5xx o cliente define `data: null` e `error: FunctionsHttpError`;
  * o JSON `{ error: "..." }` retornado pela função está em `error.context` (Response).
@@ -70,6 +74,35 @@ async function throwIfInviteFailed(
   throw new Error(((result.error as { message?: string } | undefined)?.message ?? fallback))
 }
 
+function readJwtExp(token: string): number | null {
+  try {
+    const payloadBase64 = token.split('.')[1]
+    if (!payloadBase64) return null
+    const payload = JSON.parse(atob(payloadBase64)) as JwtPayload
+    return typeof payload.exp === 'number' ? payload.exp : null
+  } catch {
+    return null
+  }
+}
+
+async function ensureFreshSessionForFunctions(): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Sessão expirada. Faça login novamente.')
+
+  const currentToken = session.access_token
+  if (!currentToken) throw new Error('Token de sessão inválido. Faça login novamente.')
+
+  const exp = readJwtExp(currentToken)
+  const nowInSeconds = Math.floor(Date.now() / 1000)
+  const isNearExpiry = typeof exp === 'number' && exp - nowInSeconds < 60
+  if (!isNearExpiry) return
+
+  const { data, error } = await supabase.auth.refreshSession()
+  if (error || !data.session?.access_token) {
+    throw new Error('Não foi possível renovar a sessão. Faça login novamente.')
+  }
+}
+
 export async function fetchPerfisForAdmin(): Promise<Perfil[]> {
   const { data, error } = await supabase.from('perfis').select('*').order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
@@ -83,11 +116,9 @@ export interface InviteUserPayload {
 }
 
 export async function invokeInviteUser(payload: InviteUserPayload): Promise<void> {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new Error('Sessão expirada. Faça login novamente.')
+  await ensureFreshSessionForFunctions()
 
-  // Não enviar Authorization manualmente: o fetch do SupabaseClient (fetchWithAuth)
-  // injeta Bearer a partir da sessão; header duplicado/errado pode gerar 401 Invalid JWT no gateway.
+  // Deixa o cliente Supabase anexar Authorization/apikey automaticamente para evitar header duplicado.
   const response = await supabase.functions.invoke('invite-user', {
     body: {
       email: payload.email.trim().toLowerCase(),
@@ -100,8 +131,7 @@ export async function invokeInviteUser(payload: InviteUserPayload): Promise<void
 }
 
 export async function invokeResendInvite(email: string): Promise<void> {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new Error('Sessão expirada. Faça login novamente.')
+  await ensureFreshSessionForFunctions()
 
   const response = await supabase.functions.invoke('invite-user', {
     body: { resend: true, email: email.trim().toLowerCase() },
