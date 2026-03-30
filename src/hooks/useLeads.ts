@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchDocumentCountsByLeadIds, logExportacao, reassignLeadConsultor, type LeadsListFiltersSnapshot } from '@/services/leads'
 import { PIPELINE_QUERY_KEYS } from '@/hooks/usePipeline'
+import { invalidateDashboardQueries } from '@/hooks/useDashboard'
 import type { Lead } from '@/types'
 
 export const LEADS_QUERY_KEYS = {
@@ -23,6 +24,7 @@ export function useReassignLeadConsultor() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
       queryClient.invalidateQueries({ queryKey: ['leads'] })
+      invalidateDashboardQueries(queryClient)
     },
   })
 }

@@ -10,6 +10,7 @@ import {
   type CreateLeadInput,
   type MarkAsLostInput,
 } from '@/services/pipeline'
+import { invalidateDashboardQueries } from '@/hooks/useDashboard'
 import type { Lead, LeadStatus } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -59,6 +60,7 @@ export function useCreateLead() {
     mutationFn: (input: CreateLeadInput) => createLead(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
+      invalidateDashboardQueries(queryClient)
     },
   })
 }
@@ -70,6 +72,7 @@ export function useAdvanceStage() {
       advanceStage(lead, targetStatus),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
+      invalidateDashboardQueries(queryClient)
     },
   })
 }
@@ -81,6 +84,7 @@ export function useMarkAsLost() {
       markAsLost(lead, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
+      invalidateDashboardQueries(queryClient)
     },
   })
 }
@@ -91,6 +95,7 @@ export function useInactivateLead() {
     mutationFn: (lead: Lead) => inactivateLead(lead),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
+      invalidateDashboardQueries(queryClient)
     },
   })
 }
