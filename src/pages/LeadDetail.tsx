@@ -28,6 +28,33 @@ import { ChevronDown, Save, ArrowRight, XCircle, UserX, Loader2, Plus, X } from 
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
+type UploadedLeadFile = { file: File; nome_descricao: string }
+
+function getDocumentoFormato(fileName: string): DocumentoLead['formato'] | null {
+  const extension = fileName.split('.').pop()?.toLowerCase()
+  if (extension === 'doc' || extension === 'docx' || extension === 'jpg' || extension === 'pdf') {
+    return extension
+  }
+  return null
+}
+
+function sanitizeFileName(fileName: string): string {
+  return fileName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+}
+
+function getStoragePathFromArquivoUrl(arquivoUrl: string): string {
+  if (!arquivoUrl.startsWith('http')) return arquivoUrl
+
+  const marker = '/documentos-leads/'
+  const markerIndex = arquivoUrl.indexOf(marker)
+  if (markerIndex === -1) return arquivoUrl
+
+  return decodeURIComponent(arquivoUrl.slice(markerIndex + marker.length))
+}
+
 export default function LeadDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -46,7 +73,8 @@ export default function LeadDetailPage() {
   const [newNote, setNewNote] = useState('')
   const [isPJ, setIsPJ] = useState(false)
   const [socios, setSocios] = useState<{ nome: string; contato: string }[]>([])
-  const [uploadedFiles, setUploadedFiles] = useState<{ file: File; nome_descricao: string }[]>([])
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedLeadFile[]>([])
+  const [fileUploadKey, setFileUploadKey] = useState(0)
 
   const [historico, setHistorico] = useState<(HistoricoInteracao & { autor_nome?: string })[]>([])
   const [documentos, setDocumentos] = useState<DocumentoLead[]>([])
@@ -111,9 +139,71 @@ export default function LeadDetailPage() {
     })
   }
 
+  const persistUploadedFiles = async (): Promise<number> => {
+    if (!lead || !user || uploadedFiles.length === 0) return 0
+
+    if (uploadedFiles.some(f => !f.nome_descricao.trim())) {
+      toast.error('Preencha a descrição de todos os documentos anexados.')
+      return -1
+    }
+
+    const uploads = await Promise.all(
+      uploadedFiles.map(async (uploaded, idx) => {
+        const formato = getDocumentoFormato(uploaded.file.name)
+        if (!formato) throw new Error(`Formato não suportado: ${uploaded.file.name}`)
+
+        const safeName = sanitizeFileName(uploaded.file.name)
+        const filePath = `${lead.id}/${Date.now()}_${idx}_${safeName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('documentos-leads')
+          .upload(filePath, uploaded.file, { upsert: false })
+
+        if (uploadError) throw new Error(uploadError.message)
+
+        return {
+          lead_id: lead.id,
+          uploaded_by: user.id,
+          nome_descricao: uploaded.nome_descricao.trim(),
+          arquivo_url: filePath,
+          formato,
+          tamanho_bytes: uploaded.file.size,
+        }
+      })
+    )
+
+    const { data: insertedDocs, error: insertError } = await supabase
+      .from('documentos_lead')
+      .insert(uploads)
+      .select('*')
+
+    if (insertError) throw new Error(insertError.message)
+
+    const persisted = (insertedDocs || []) as DocumentoLead[]
+    if (persisted.length > 0) {
+      setDocumentos(prev => [...persisted, ...prev])
+    }
+    setUploadedFiles([])
+    setFileUploadKey(prev => prev + 1)
+    return persisted.length
+  }
+
   const handleSave = async () => {
     if (!lead) return
     setSaving(true)
+    let persistedDocsCount = 0
+    try {
+      persistedDocsCount = await persistUploadedFiles()
+      if (persistedDocsCount < 0) {
+        setSaving(false)
+        return
+      }
+    } catch (err) {
+      setSaving(false)
+      toast.error(`Erro ao enviar documentos: ${(err as Error).message}`)
+      return
+    }
+
     const { error } = await supabase.from('leads').update({
       nome: lead.nome,
       telefone: lead.telefone,
@@ -142,11 +232,15 @@ export default function LeadDetailPage() {
     if (error) {
       toast.error('Erro ao salvar: ' + error.message)
     } else {
-      toast.success('Lead salvo com sucesso!')
+      if (persistedDocsCount > 0) {
+        toast.success(`Lead salvo com sucesso! ${persistedDocsCount} documento(s) enviado(s).`)
+      } else {
+        toast.success('Lead salvo com sucesso!')
+      }
     }
   }
 
-  const validateAdvance = (): boolean => {
+  const validateAdvance = (persistedDocsCount: number): boolean => {
     const missing: string[] = []
 
     if (lead.status === 'atendimento') {
@@ -160,9 +254,8 @@ export default function LeadDetailPage() {
       if (!lead.cpf) missing.push('CPF')
       if (isPJ && !lead.cnpj) missing.push('CNPJ')
       if (isPJ && !lead.razao_social) missing.push('Razão Social')
-      const totalDocs = documentos.length + uploadedFiles.length
+      const totalDocs = documentos.length + persistedDocsCount
       if (totalDocs === 0) missing.push('Ao menos 1 documento enviado')
-      if (uploadedFiles.some(f => !f.nome_descricao.trim())) missing.push('Descrição obrigatória em todos os documentos anexados')
       if (lead.status_financeiro !== 'pago') {
         setBlockingFields(['Confirme o pagamento antes de fechar este lead.'])
         setBlockingMsg('O status financeiro deve estar como "Pago" para avançar.')
@@ -181,7 +274,18 @@ export default function LeadDetailPage() {
   }
 
   const handleAdvance = async () => {
-    if (!validateAdvance()) return
+    let persistedDocsCount = 0
+    if (lead.status === 'negociacao') {
+      try {
+        persistedDocsCount = await persistUploadedFiles()
+        if (persistedDocsCount < 0) return
+      } catch (err) {
+        toast.error(`Erro ao enviar documentos: ${(err as Error).message}`)
+        return
+      }
+    }
+
+    if (!validateAdvance(persistedDocsCount)) return
     const nextStatus = lead.status === 'atendimento' ? 'negociacao' : lead.status === 'negociacao' ? 'fechado' : lead.status
 
     const { error } = await supabase.from('leads').update({ status: nextStatus }).eq('id', lead.id)
@@ -197,6 +301,20 @@ export default function LeadDetailPage() {
   const canAdvance = lead.status === 'atendimento' || lead.status === 'negociacao'
   const canLose = (lead.status === 'atendimento' || lead.status === 'negociacao') && canMarkAsLost(lead.consultor_id)
   const canInactivate = lead.status === 'fechado' && canInactivateLead(lead.consultor_id)
+
+  const handleDownloadDocumento = async (doc: DocumentoLead) => {
+    const storagePath = getStoragePathFromArquivoUrl(doc.arquivo_url)
+    const { data, error } = await supabase.storage
+      .from('documentos-leads')
+      .createSignedUrl(storagePath, 60)
+
+    if (error || !data?.signedUrl) {
+      toast.error('Não foi possível gerar o link de download do documento.')
+      return
+    }
+
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+  }
 
   const handleLoss = async () => {
     if (!lossMotive) return
@@ -440,7 +558,7 @@ export default function LeadDetailPage() {
           <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.docs && 'rotate-180')} />
         </CollapsibleTrigger>
         <CollapsibleContent className="rounded-b-lg border border-t-0 border-border bg-card p-4 space-y-4">
-          <FileUpload onFilesChange={setUploadedFiles} />
+          <FileUpload key={fileUploadKey} onFilesChange={setUploadedFiles} />
           {documentos.length > 0 && (
             <div className="space-y-2">
               {documentos.map(doc => (
@@ -452,7 +570,14 @@ export default function LeadDetailPage() {
                       <p className="text-xs text-muted-foreground">{doc.formato.toUpperCase()} • {new Date(doc.created_at).toLocaleDateString('pt-BR')}</p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">Download</Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-primary hover:text-primary/80"
+                    onClick={() => handleDownloadDocumento(doc)}
+                  >
+                    Download
+                  </Button>
                 </div>
               ))}
             </div>
