@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge } from '@/components/StatusBadge'
 import { BlockingModal } from '@/components/BlockingModal'
-import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { FileUpload } from '@/components/FileUpload'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,8 +22,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Dialog } from '@/components/ui/dialog'
 import { useAuth } from '@/hooks/useAuth'
+import { PIPELINE_QUERY_KEYS } from '@/hooks/usePipeline'
 import { usePermissions } from '@/hooks/usePermissions'
 import { supabase } from '@/integrations/supabase/client'
 import { calculateValorLiquido, inactivateLead as inactivateLeadService } from '@/services/pipeline'
@@ -81,39 +89,125 @@ export default function LeadDetailPage() {
   const [consultores, setConsultores] = useState<Perfil[]>([])
 
   // Sections
-  const [openSections, setOpenSections] = useState({ basico: true, negociacao: true, contratual: true, docs: true, financeiro: true, historico: true })
+  const [openSections, setOpenSections] = useState({
+    basico: true,
+    qualificacao: true,
+    negociacao: true,
+    contratual: true,
+    docs: true,
+    financeiro: true,
+    historico: true,
+  })
+
+  const queryClient = useQueryClient()
+
+  const invalidateLeadsQueries = () => {
+    queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
+    queryClient.invalidateQueries({ queryKey: ['leads'] })
+  }
 
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
-      
-      const { data: leadData } = await supabase.from('leads').select('*').eq('id', Number(id)).single()
-      if (!leadData) { setLoading(false); return }
-      setLead(leadData as Lead)
-      setIsPJ(!!(leadData as Lead).cnpj)
-      setSocios(((leadData as Lead).socios as { nome: string; contato: string }[]) || [])
+    let cancelled = false
 
-      // Fetch related data in parallel
+    async function fetchLeadAndRelated() {
+      setLoading(true)
+      setLead(null)
+      setHistorico([])
+      setDocumentos([])
+      setConsultores([])
+
+      const leadId = id != null && id !== '' ? Number(id) : NaN
+      if (Number.isNaN(leadId)) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        const { data: leadData, error: leadError } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('id', leadId)
+          .single()
+
+        if (cancelled) return
+
+        if (leadError) {
+          setLead(null)
+          toast.error(`Erro ao carregar lead: ${leadError.message}`)
+          return
+        }
+        if (!leadData) {
+          setLead(null)
+          return
+        }
+
+        setLead(leadData as Lead)
+        setIsPJ(!!(leadData as Lead).cnpj)
+        setSocios(((leadData as Lead).socios as { nome: string; contato: string }[]) || [])
+      } catch (error) {
+        if (!cancelled) {
+          setLead(null)
+          toast.error(`Erro ao carregar lead: ${(error as Error).message}`)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+
+      // Dados secundários não bloqueiam a tela (evita spinner infinito se uma query pendurar ou RLS falhar)
+      if (cancelled) return
+
       const [historicoRes, docsRes, consultoresRes] = await Promise.all([
-        supabase.from('historico_interacoes').select('*').eq('lead_id', Number(id)).order('created_at', { ascending: false }),
-        supabase.from('documentos_lead').select('*').eq('lead_id', Number(id)),
+        supabase.from('historico_interacoes').select('*').eq('lead_id', leadId).order('created_at', { ascending: true }),
+        supabase.from('documentos_lead').select('*').eq('lead_id', leadId),
         supabase.from('perfis').select('*').in('role', ['consultor', 'admin']).eq('status', 'ativo'),
       ])
 
-      // Fetch author names for historico
-      const autorIds = [...new Set((historicoRes.data || []).map(h => h.autor_id))]
-      let autorNames: Record<string, string> = {}
-      if (autorIds.length > 0) {
-        const { data: autores } = await supabase.from('perfis').select('id, nome_completo').in('id', autorIds)
-        autores?.forEach(a => { autorNames[a.id] = a.nome_completo })
+      if (cancelled) return
+
+      if (historicoRes.error) {
+        toast.error(`Histórico: ${historicoRes.error.message}`)
+      }
+      if (docsRes.error) {
+        toast.error(`Documentos: ${docsRes.error.message}`)
+      }
+      if (consultoresRes.error) {
+        toast.error(`Consultores: ${consultoresRes.error.message}`)
       }
 
-      setHistorico((historicoRes.data || []).map(h => ({ ...h, autor_nome: autorNames[h.autor_id] })) as (HistoricoInteracao & { autor_nome?: string })[])
-      setDocumentos((docsRes.data || []) as DocumentoLead[])
-      setConsultores((consultoresRes.data || []) as Perfil[])
-      setLoading(false)
+      const rows = historicoRes.data || []
+      const autorIds = [...new Set(rows.map(h => h.autor_id))]
+      const autorNames: Record<string, string> = {}
+      if (autorIds.length > 0 && !historicoRes.error) {
+        const { data: autores, error: autoresError } = await supabase
+          .from('perfis')
+          .select('id, nome_completo')
+          .in('id', autorIds)
+        if (autoresError) {
+          toast.error(`Autores (histórico): ${autoresError.message}`)
+        } else {
+          autores?.forEach(a => {
+            autorNames[a.id] = a.nome_completo
+          })
+        }
+      }
+
+      if (!cancelled && !historicoRes.error) {
+        setHistorico(
+          rows.map(h => ({ ...h, autor_nome: autorNames[h.autor_id] })) as (HistoricoInteracao & { autor_nome?: string })[],
+        )
+      }
+      if (!cancelled && !docsRes.error) {
+        setDocumentos((docsRes.data || []) as DocumentoLead[])
+      }
+      if (!cancelled && !consultoresRes.error) {
+        setConsultores((consultoresRes.data || []) as Perfil[])
+      }
     }
-    fetchData()
+
+    void fetchLeadAndRelated()
+    return () => {
+      cancelled = true
+    }
   }, [id])
 
   if (loading) {
@@ -232,6 +326,7 @@ export default function LeadDetailPage() {
     if (error) {
       toast.error('Erro ao salvar: ' + error.message)
     } else {
+      invalidateLeadsQueries()
       if (persistedDocsCount > 0) {
         toast.success(`Lead salvo com sucesso! ${persistedDocsCount} documento(s) enviado(s).`)
       } else {
@@ -295,6 +390,7 @@ export default function LeadDetailPage() {
     }
 
     setLead(prev => prev ? { ...prev, status: nextStatus as Lead['status'] } : prev)
+    invalidateLeadsQueries()
     toast.success(`Lead avançou para ${lead.status === 'atendimento' ? 'Negociação' : 'Fechado'}!`)
   }
 
@@ -333,6 +429,7 @@ export default function LeadDetailPage() {
 
     setLead(prev => prev ? { ...prev, status: 'perdido', motivo_perda_tipo: lossMotive as MotivoPerdaTipo, motivo_perda_descricao: lossMotive === 'outro' ? lossDesc : null } : prev)
     setLossOpen(false)
+    invalidateLeadsQueries()
     toast.success('Lead marcado como perdido')
   }
 
@@ -349,8 +446,9 @@ export default function LeadDetailPage() {
       return
     }
 
-    setHistorico(prev => [{ ...data, autor_nome: user.nome_completo } as (HistoricoInteracao & { autor_nome?: string }), ...prev])
+    setHistorico(prev => [...prev, { ...data, autor_nome: user.nome_completo } as (HistoricoInteracao & { autor_nome?: string })])
     setNewNote('')
+    invalidateLeadsQueries()
     toast.success('Anotação registrada!')
   }
 
@@ -361,42 +459,18 @@ export default function LeadDetailPage() {
   const showContratual = ['negociacao', 'fechado', 'inativo'].includes(lead.status)
 
   return (
-    <div className="space-y-4 max-w-4xl mx-auto pb-24 md:pb-8">
+    <div className="space-y-4 max-w-4xl mx-auto pb-28 md:pb-24">
       <PageHeader
         title={lead.nome}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="hidden md:flex items-center gap-2 flex-wrap">
             <StatusBadge status={lead.status} />
-            <Button onClick={handleSave} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary/90">
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Salvar
-            </Button>
-            {canAdvance && (
-              <Button onClick={handleAdvance} variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
-                <ArrowRight className="mr-2 h-4 w-4" /> Avançar Etapa
-              </Button>
-            )}
-            {canLose && (
-              <Button onClick={() => setLossOpen(true)} variant="outline" className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground">
-                <XCircle className="mr-2 h-4 w-4" /> Marcar como Perdido
-              </Button>
-            )}
-            {canInactivate && (
-              <Button variant="outline" className="border-muted-foreground text-muted-foreground" onClick={async () => {
-                try {
-                  const updated = await inactivateLeadService(lead)
-                  setLead(updated)
-                  toast.success('Cliente inativado')
-                } catch (err) {
-                  toast.error(`Erro ao inativar: ${(err as Error).message}`)
-                }
-              }}>
-                <UserX className="mr-2 h-4 w-4" /> Inativar
-              </Button>
-            )}
           </div>
         }
       />
+      <div className="md:hidden flex items-center gap-2">
+        <StatusBadge status={lead.status} />
+      </div>
 
       {/* Section 1 - Basic Data */}
       <Collapsible open={openSections.basico} onOpenChange={v => setOpenSections(p => ({ ...p, basico: v }))}>
@@ -415,24 +489,6 @@ export default function LeadDetailPage() {
               <Input value={lead.telefone} onChange={e => updateField('telefone', e.target.value)} className="bg-background border-border" />
             </div>
             <div className="space-y-2">
-              <Label className="text-foreground">Origem</Label>
-              <Select value={lead.origem || ''} onValueChange={v => updateField('origem', v as LeadOrigem)}>
-                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {Object.entries(LEAD_ORIGEM_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-foreground">Necessidade Identificada</Label>
-              <Select value={lead.necessidade || ''} onValueChange={v => updateField('necessidade', v as LeadNecessidade)}>
-                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {Object.entries(LEAD_NECESSIDADE_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label className="text-foreground">Responsável</Label>
               {canAssignConsultor ? (
                 <Select value={lead.consultor_id} onValueChange={v => updateField('consultor_id', v)}>
@@ -448,6 +504,36 @@ export default function LeadDetailPage() {
             <div className="space-y-2">
               <Label className="text-muted-foreground">Data de Cadastro</Label>
               <Input value={new Date(lead.created_at).toLocaleDateString('pt-BR')} readOnly className="bg-background border-border text-muted-foreground" />
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Qualificação — a partir do estágio Atendimento */}
+      <Collapsible open={openSections.qualificacao} onOpenChange={v => setOpenSections(p => ({ ...p, qualificacao: v }))}>
+        <CollapsibleTrigger className={cn("flex w-full items-center justify-between bg-card border border-border p-4", openSections.qualificacao ? "rounded-t-lg" : "rounded-lg")}>
+          <h3 className="font-semibold text-foreground">Qualificação</h3>
+          <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.qualificacao && 'rotate-180')} />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="rounded-b-lg border border-t-0 border-border bg-card p-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-foreground">Origem</Label>
+              <Select value={lead.origem || ''} onValueChange={v => updateField('origem', v as LeadOrigem)}>
+                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  {Object.entries(LEAD_ORIGEM_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-foreground">Necessidade identificada</Label>
+              <Select value={lead.necessidade || ''} onValueChange={v => updateField('necessidade', v as LeadNecessidade)}>
+                <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  {Object.entries(LEAD_NECESSIDADE_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CollapsibleContent>
@@ -672,30 +758,83 @@ export default function LeadDetailPage() {
       {/* Blocking Modal */}
       <BlockingModal open={blockingOpen} onOpenChange={setBlockingOpen} fields={blockingFields} message={blockingMsg} />
 
-      {/* Loss Dialog */}
-      <ConfirmDialog
-        open={lossOpen}
-        onOpenChange={setLossOpen}
-        title="Marcar como Perdido"
-        message="Selecione o motivo da perda:"
-        onConfirm={handleLoss}
-        confirmLabel="Confirmar Perda"
-        destructive
-      />
-      {lossOpen && (
-        <Dialog open={lossOpen} onOpenChange={setLossOpen}>
-          {/* Custom loss dialog handled below */}
-        </Dialog>
-      )}
+      <AlertDialog open={lossOpen} onOpenChange={setLossOpen}>
+        <AlertDialogContent className="border-border bg-card max-h-[90vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Marcar como perdido</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-2">
+              <Label className="text-foreground">Motivo</Label>
+              <Select value={lossMotive} onValueChange={v => setLossMotive(v as MotivoPerdaTipo | '')}>
+                <SelectTrigger className="bg-background border-border text-foreground">
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  {Object.entries(MOTIVO_PERDA_LABELS).map(([k, v]) => (
+                    <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {lossMotive === 'outro' && (
+              <div className="space-y-2">
+                <Label className="text-foreground">Descreva o motivo</Label>
+                <Textarea value={lossDesc} onChange={e => setLossDesc(e.target.value)} className="bg-background border-border min-h-[80px]" />
+              </div>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border bg-secondary text-foreground">Cancelar</AlertDialogCancel>
+            <Button
+              type="button"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={!lossMotive || (lossMotive === 'outro' && !lossDesc.trim())}
+              onClick={handleLoss}
+            >
+              Confirmar perda
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      {/* Mobile sticky footer */}
-      <div className="fixed bottom-0 left-0 right-0 md:hidden bg-card border-t border-border p-4 flex gap-2 z-20">
-        <Button onClick={handleSave} className="flex-1 bg-primary text-primary-foreground" size="sm">
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar'}
-        </Button>
-        {canAdvance && (
-          <Button onClick={handleAdvance} variant="outline" className="flex-1 border-primary text-primary" size="sm">Avançar</Button>
-        )}
+      {/* Rodapé fixo: ações principais (mobile + desktop) */}
+      <div className="fixed bottom-0 left-0 right-0 md:left-60 z-30 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85 p-3 shadow-lg">
+        <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-end gap-2">
+          <Button onClick={handleSave} disabled={saving} size="sm" className="bg-primary text-primary-foreground shrink-0">
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Salvar
+          </Button>
+          {canAdvance && (
+            <Button onClick={handleAdvance} variant="outline" size="sm" className="border-primary text-primary shrink-0">
+              <ArrowRight className="mr-2 h-4 w-4" /> Avançar etapa
+            </Button>
+          )}
+          {canLose && (
+            <Button onClick={() => setLossOpen(true)} variant="outline" size="sm" className="border-destructive text-destructive shrink-0">
+              <XCircle className="mr-2 h-4 w-4" /> Marcar como perdido
+            </Button>
+          )}
+          {canInactivate && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-muted-foreground text-muted-foreground shrink-0"
+              onClick={async () => {
+                try {
+                  const updated = await inactivateLeadService(lead)
+                  setLead(updated)
+                  invalidateLeadsQueries()
+                  toast.success('Cliente inativado')
+                } catch (err) {
+                  toast.error(`Erro ao inativar: ${(err as Error).message}`)
+                }
+              }}
+            >
+              <UserX className="mr-2 h-4 w-4" /> Inativar cliente
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   )

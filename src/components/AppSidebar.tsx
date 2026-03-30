@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { LayoutDashboard, Columns, Users, UserCog, LogOut } from 'lucide-react'
 import { TopClassLogo } from '@/components/TopClassLogo'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -20,6 +21,7 @@ const consultorNav = [
 ]
 
 export function AppSidebar() {
+  const queryClient = useQueryClient()
   const { user, isAdmin, logout } = useAuth()
   const location = useLocation()
   const nav = isAdmin ? adminNav : consultorNav
@@ -62,7 +64,15 @@ export function AppSidebar() {
             <p className="text-sm font-medium text-foreground truncate">{user?.nome_completo}</p>
             <StatusBadge status={user?.role || 'consultor'} className="mt-0.5" />
           </div>
-          <button onClick={() => logout()} className="text-muted-foreground hover:text-foreground transition-colors" title="Sair">
+          <button
+            type="button"
+            onClick={() => {
+              queryClient.clear()
+              logout()
+            }}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            title="Sair"
+          >
             <LogOut className="h-4 w-4" />
           </button>
         </div>

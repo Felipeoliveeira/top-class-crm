@@ -20,7 +20,7 @@ interface AuthState {
   initialized: boolean
   hasExplicitLogin: boolean
   login: (email: string, password: string) => Promise<boolean>
-  logout: () => Promise<void>
+  logout: () => void
   initialize: () => Promise<void>
   checkActiveStatus: () => Promise<void>
 }
@@ -48,32 +48,49 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initialize: async () => {
     if (get().initialized) return
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session?.user) {
-      // Hardening: nunca reaproveitar sessão pré-existente ao abrir o CRM.
-      // O usuário deve autenticar explicitamente com e-mail e senha.
-      await supabase.auth.signOut()
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        // Hardening: nunca reaproveitar sessão pré-existente ao abrir o CRM.
+        void supabase.auth.signOut()
+      }
+    } catch {
+      // Sessão/localStorage pode estar corrompido; segue para tela de login.
     }
     set({ user: null, supabaseUser: null, isAuthenticated: false, initialized: true, hasExplicitLogin: false })
 
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session?.user) {
-        set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false })
+        set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false, isLoading: false })
         return
       }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (!get().hasExplicitLogin) {
-          await supabase.auth.signOut()
-          set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false })
+          // Evita deadlock/reentrância: não await signOut dentro do callback do Supabase
+          queueMicrotask(() => {
+            void supabase.auth.signOut()
+          })
+          set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false, isLoading: false })
           return
         }
-        const perfil = await fetchPerfil(session.user.id)
-        if (perfil && perfil.status === 'ativo') {
-          set({ user: perfil, supabaseUser: session.user, isAuthenticated: true })
-        } else {
-          await supabase.auth.signOut()
-          set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false })
-        }
+        void (async () => {
+          try {
+            const perfil = await fetchPerfil(session.user.id)
+            if (perfil && perfil.status === 'ativo') {
+              set({ user: perfil, supabaseUser: session.user, isAuthenticated: true })
+            } else {
+              queueMicrotask(() => {
+                void supabase.auth.signOut()
+              })
+              set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false, isLoading: false })
+            }
+          } catch {
+            queueMicrotask(() => {
+              void supabase.auth.signOut()
+            })
+            set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false, isLoading: false })
+          }
+        })()
       }
     })
   },
@@ -91,8 +108,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ user: perfil, supabaseUser: data.user, isAuthenticated: true })
           success = true
         } else {
-          await supabase.auth.signOut()
           set({ hasExplicitLogin: false })
+          queueMicrotask(() => {
+            void supabase.auth.signOut()
+          })
         }
       }
     } catch {
@@ -113,21 +132,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return success
   },
 
-  logout: async () => {
-    await supabase.auth.signOut()
-    set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false })
+  logout: () => {
+    // Limpa estado e UI imediatamente; signOut em background evita trava se o listener travar await.
+    set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false, isLoading: false })
+    void supabase.auth.signOut()
   },
 
   checkActiveStatus: async () => {
     const currentUser = get().supabaseUser
     if (!currentUser) return
 
-    const perfil = await fetchPerfil(currentUser.id)
-    if (!perfil || perfil.status !== 'ativo') {
-      await supabase.auth.signOut()
-      set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false })
-    } else {
-      set({ user: perfil })
+    try {
+      const perfil = await fetchPerfil(currentUser.id)
+      if (!perfil || perfil.status !== 'ativo') {
+        set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false, isLoading: false })
+        queueMicrotask(() => {
+          void supabase.auth.signOut()
+        })
+      } else {
+        set({ user: perfil })
+      }
+    } catch {
+      set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false, isLoading: false })
+      queueMicrotask(() => {
+        void supabase.auth.signOut()
+      })
     }
   },
 }))

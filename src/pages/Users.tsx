@@ -25,9 +25,16 @@ export default function UsersPage() {
   useEffect(() => {
     async function fetchUsers() {
       setLoading(true)
-      const { data } = await supabase.from('perfis').select('*').order('created_at', { ascending: false })
-      setUsers((data as Perfil[]) || [])
-      setLoading(false)
+      try {
+        const { data, error } = await supabase.from('perfis').select('*').order('created_at', { ascending: false })
+        if (error) throw error
+        setUsers((data as Perfil[]) || [])
+      } catch (error) {
+        setUsers([])
+        toast.error(`Erro ao carregar usuários: ${(error as Error).message}`)
+      } finally {
+        setLoading(false)
+      }
     }
     fetchUsers()
   }, [])
