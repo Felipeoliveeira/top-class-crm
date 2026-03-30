@@ -50,15 +50,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { email, nome_completo, role } = await req.json()
-
-    if (!email || !nome_completo || !role) {
-      return new Response(JSON.stringify({ error: 'Email, nome e role são obrigatórios' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
+    const body = await req.json()
     const frontendBase = (Deno.env.get('FRONTEND_URL') ?? '').replace(/\/$/, '')
     if (!frontendBase) {
       return new Response(
@@ -75,7 +67,79 @@ Deno.serve(async (req) => {
 
     const redirectTo = `${frontendBase}/definir-senha`
 
-    // Enviar convite via Supabase Auth Admin (redirect alinha convite à mesma rota que recuperação de senha — RF-04)
+    // -------------------------------------------------------------------------
+    // Reenvio de convite (RF-34): mesmo redirect /definir-senha, novo link ~24h
+    // -------------------------------------------------------------------------
+    if (body.resend === true) {
+      const email = String(body.email ?? '')
+        .trim()
+        .toLowerCase()
+      if (!email) {
+        return new Response(JSON.stringify({ error: 'E-mail é obrigatório para reenvio' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { data: perfil, error: perfilErr } = await supabaseAdmin
+        .from('perfis')
+        .select('id, email, nome_completo, role, ultimo_acesso')
+        .ilike('email', email)
+        .maybeSingle()
+
+      if (perfilErr || !perfil) {
+        return new Response(JSON.stringify({ error: 'Usuário não encontrado' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (perfil.ultimo_acesso) {
+        return new Response(
+          JSON.stringify({
+            error: 'Este usuário já realizou o primeiro acesso. Use recuperação de senha se necessário.',
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        data: { nome_completo: perfil.nome_completo, role: perfil.role },
+        redirectTo,
+      })
+
+      if (inviteError) {
+        return new Response(JSON.stringify({ error: inviteError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      return new Response(JSON.stringify({ success: true, message: 'Convite reenviado com sucesso!' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // -------------------------------------------------------------------------
+    // Novo convite (RF-32)
+    // -------------------------------------------------------------------------
+    const email = String(body.email ?? '')
+      .trim()
+      .toLowerCase()
+    const nome_completo = String(body.nome_completo ?? '').trim()
+    const role = body.role
+
+    if (!email || !nome_completo || !role) {
+      return new Response(JSON.stringify({ error: 'Email, nome e role são obrigatórios' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: { nome_completo, role },
       redirectTo,
@@ -88,7 +152,6 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Criar/atualizar o perfil do usuário convidado
     if (inviteData?.user) {
       await supabaseAdmin.from('perfis').upsert({
         id: inviteData.user.id,

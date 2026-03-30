@@ -92,9 +92,8 @@ export default function SetPasswordPage() {
       if (error) {
         errorMessage = error.message
       } else {
-        toast.success('Senha definida com sucesso!')
         await supabase.auth.signOut()
-        navigate('/login')
+        navigate('/login', { replace: true, state: { fromPasswordSetup: true } })
       }
     } catch {
       errorMessage = 'Erro ao definir senha. Tente novamente.'
