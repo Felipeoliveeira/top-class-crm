@@ -62,10 +62,10 @@ export default function SetPasswordPage() {
         return
       }
 
-      if (event === 'INITIAL_SESSION') {
-        resolved = true
-        setPageState(session ? 'ready' : 'expired')
-      }
+      // INITIAL_SESSION é ignorado intencionalmente: ele dispara com session=null
+      // antes do Supabase concluir o processamento do hash do link de convite/recovery,
+      // causando uma race condition que exibiria "expirado" para links válidos.
+      // O timeout abaixo cobre o fallback após 5s.
     })
 
     const timeout = setTimeout(async () => {
@@ -73,7 +73,7 @@ export default function SetPasswordPage() {
       resolved = true
       const { data: { session } } = await supabase.auth.getSession()
       setPageState(session ? 'ready' : 'expired')
-    }, 4000)
+    }, 5000)
 
     return () => {
       subscription.unsubscribe()
