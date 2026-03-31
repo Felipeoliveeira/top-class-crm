@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { TopClassLogo } from '@/components/TopClassLogo'
 import { Button } from '@/components/ui/button'
@@ -12,23 +12,10 @@ import { Loader2, AlertTriangle } from 'lucide-react'
 type PageState = 'loading' | 'ready' | 'expired'
 type TokenType = 'invite' | 'recovery'
 
-function tokenTypeFromHash(hash: string): TokenType {
-  return hash.includes('type=invite') ? 'invite' : 'recovery'
-}
-
-/** Lê access_token / refresh_token do fragmento (#) ou query (alguns fluxos). */
-function getTokensFromUrl(): { access_token: string | null; refresh_token: string | null } {
-  const url = new URL(window.location.href)
-  const fromHash = new URLSearchParams(url.hash.replace(/^#/, ''))
-  const accessFromHash = fromHash.get('access_token')
-  const refreshFromHash = fromHash.get('refresh_token')
-  if (accessFromHash && refreshFromHash) {
-    return { access_token: accessFromHash, refresh_token: refreshFromHash }
-  }
-  return {
-    access_token: url.searchParams.get('access_token'),
-    refresh_token: url.searchParams.get('refresh_token'),
-  }
+function detectTokenType(): TokenType {
+  const hash = window.location.hash
+  if (hash.includes('type=invite')) return 'invite'
+  return 'recovery'
 }
 
 function hasErrorInUrl(): boolean {
@@ -52,65 +39,46 @@ export default function SetPasswordPage() {
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
   const [pageState, setPageState] = useState<PageState>('loading')
-  const [tokenType, setTokenType] = useState<TokenType>(() =>
-    tokenTypeFromHash(typeof window !== 'undefined' ? window.location.hash : ''),
-  )
   const navigate = useNavigate()
-  const initOnce = useRef(false)
 
+  const tokenType = detectTokenType()
   const { title, subtitle } = PAGE_CONTENT[tokenType]
   const isValid = password.length >= 8 && password === confirm
 
   useEffect(() => {
-    if (initOnce.current) return
-    initOnce.current = true
-
-    const run = async () => {
-      setTokenType(tokenTypeFromHash(window.location.hash))
-
-      if (hasErrorInUrl()) {
-        setPageState('expired')
-        return
-      }
-
-      const url = new URL(window.location.href)
-      const code = url.searchParams.get('code')
-      const { access_token, refresh_token } = getTokensFromUrl()
-
-      let sessionEstablished = false
-
-      if (code) {
-        const { error: codeErr } = await supabase.auth.exchangeCodeForSession(code)
-        if (!codeErr) {
-          sessionEstablished = true
-          url.searchParams.delete('code')
-          window.history.replaceState({}, '', `${url.pathname}${url.hash}`)
-        } else if (!access_token || !refresh_token) {
-          setPageState('expired')
-          return
-        }
-      }
-
-      if (!sessionEstablished && access_token && refresh_token) {
-        await supabase.auth.signOut({ scope: 'local' })
-        const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token })
-        if (setErr) {
-          setPageState('expired')
-          return
-        }
-        window.history.replaceState({}, '', url.pathname)
-      }
-
-      const { data: { session }, error: sessionErr } = await supabase.auth.getSession()
-      if (sessionErr || !session) {
-        setPageState('expired')
-        return
-      }
-
-      setPageState('ready')
+    if (hasErrorInUrl()) {
+      setPageState('expired')
+      return
     }
 
-    void run()
+    let resolved = false
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (resolved) return
+
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+        resolved = true
+        setPageState(session ? 'ready' : 'expired')
+        return
+      }
+
+      // INITIAL_SESSION é ignorado intencionalmente: ele dispara com session=null
+      // antes do Supabase concluir o processamento do hash do link de convite/recovery,
+      // causando uma race condition que exibiria "expirado" para links válidos.
+      // O timeout abaixo cobre o fallback após 5s.
+    })
+
+    const timeout = setTimeout(async () => {
+      if (resolved) return
+      resolved = true
+      const { data: { session } } = await supabase.auth.getSession()
+      setPageState(session ? 'ready' : 'expired')
+    }, 5000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
+    }
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -120,35 +88,25 @@ export default function SetPasswordPage() {
     setLoading(true)
     let errorMessage: string | null = null
     try {
-      const { data: sessionCheck } = await supabase.auth.getSession()
-      if (!sessionCheck.session) {
-        errorMessage = 'Sessão não encontrada. Abra o link do e-mail novamente.'
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) {
+        errorMessage = error.message
       } else {
-        const { error } = await supabase.auth.updateUser({ password })
-        if (error) {
-          errorMessage = error.message
-        } else {
-          await supabase.auth.signOut()
-          navigate('/login', { replace: true, state: { fromPasswordSetup: true } })
-        }
+        await supabase.auth.signOut()
+        navigate('/login', { replace: true, state: { fromPasswordSetup: true } })
       }
-    } catch (e) {
-      errorMessage = e instanceof Error ? e.message : 'Erro ao definir senha. Tente novamente.'
+    } catch {
+      errorMessage = 'Erro ao definir senha. Tente novamente.'
     } finally {
       setLoading(false)
     }
 
     if (errorMessage) {
       const msg = errorMessage.toLowerCase()
-      if (
-        msg.includes('expired') ||
-        msg.includes('invalid') ||
-        msg.includes('token') ||
-        msg.includes('session')
-      ) {
+      if (msg.includes('expired') || msg.includes('invalid') || msg.includes('token')) {
         setPageState('expired')
       } else {
-        toast.error(errorMessage)
+        toast.error('Erro ao definir senha. Tente novamente.')
       }
       return
     }
