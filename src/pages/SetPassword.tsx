@@ -13,14 +13,29 @@ type PageState = 'loading' | 'ready' | 'expired'
 type TokenType = 'invite' | 'recovery'
 
 function detectTokenType(): TokenType {
-  const hash = window.location.hash
-  if (hash.includes('type=invite')) return 'invite'
+  // Supabase pode entregar o parâmetro `type` tanto no hash (#) quanto na
+  // query string (?), dependendo da versão e do fluxo. Checamos os dois.
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  const searchParams = new URLSearchParams(window.location.search)
+
+  const type = hashParams.get('type') ?? searchParams.get('type')
+
+  // 'invite'  → convite enviado pelo admin via Supabase Dashboard / Edge Function
+  // 'signup'  → confirmação de novo cadastro (Supabase usa este valor nos links de convite
+  //             dependendo da configuração do projeto)
+  if (type === 'invite' || type === 'signup') return 'invite'
   return 'recovery'
 }
 
 function hasErrorInUrl(): boolean {
-  const hash = window.location.hash
-  return hash.includes('error=') || hash.includes('error_code=')
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  const searchParams = new URLSearchParams(window.location.search)
+  return (
+    hashParams.has('error') ||
+    hashParams.has('error_code') ||
+    searchParams.has('error') ||
+    searchParams.has('error_code')
+  )
 }
 
 const PAGE_CONTENT: Record<TokenType, { title: string; subtitle: string }> = {
@@ -39,9 +54,12 @@ export default function SetPasswordPage() {
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
   const [pageState, setPageState] = useState<PageState>('loading')
+  // Captura o tipo do token na montagem inicial via inicializador lazy.
+  // O Supabase limpa o hash da URL ao processar o link, então avaliar em cada
+  // render retornaria 'recovery' incorretamente nas renderizações seguintes.
+  const [tokenType] = useState<TokenType>(() => detectTokenType())
   const navigate = useNavigate()
 
-  const tokenType = detectTokenType()
   const { title, subtitle } = PAGE_CONTENT[tokenType]
   const isValid = password.length >= 8 && password === confirm
 
