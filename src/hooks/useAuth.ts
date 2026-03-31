@@ -48,9 +48,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initialize: async () => {
     if (get().initialized) return
 
+    // Rotas públicas de autenticação por link: não invalidar a sessão estabelecida
+    // pelo token do e-mail de convite ou recuperação de senha.
+    const isAuthSetupRoute = ['/definir-senha', '/recuperar-senha']
+      .some(p => window.location.pathname.startsWith(p))
+
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
+      if (session?.user && !isAuthSetupRoute) {
         // Hardening: nunca reaproveitar sessão pré-existente ao abrir o CRM.
         void supabase.auth.signOut()
       }
@@ -66,10 +71,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (!get().hasExplicitLogin) {
-          // Evita deadlock/reentrância: não await signOut dentro do callback do Supabase
-          queueMicrotask(() => {
-            void supabase.auth.signOut()
-          })
+          // Se esta aba está em /definir-senha ou /recuperar-senha, a sessão foi
+          // estabelecida pelo link do e-mail — deixar o componente da página lidar com ela.
+          if (['/definir-senha', '/recuperar-senha'].some(p => window.location.pathname.startsWith(p))) return
+
+          // Em outras abas (login, dashboard…), recusar a autenticação silenciosa SEM
+          // chamar signOut() no servidor: um signOut() aqui destruiria a sessão de convite
+          // aberta em outra janela/aba via sincronização de localStorage.
           set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false, isLoading: false })
           return
         }
