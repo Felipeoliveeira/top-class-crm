@@ -37,6 +37,12 @@ export interface Lead {
   socios: { nome: string; contato: string }[] | null
   status_financeiro: StatusFinanceiro | null
   data_prevista_pagamento: number | null
+  /** ISO YYYY-MM-DD */
+  data_inicio_contrato: string | null
+  /** ISO YYYY-MM-DD */
+  data_fim_contrato: string | null
+  /** null = não informado; obrigatório escolher Sim ou Não para fechar o lead */
+  possui_nota_fiscal: boolean | null
   motivo_perda_tipo: MotivoPerdaTipo | null
   motivo_perda_descricao: string | null
   created_at: string
