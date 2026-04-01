@@ -48,57 +48,49 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initialize: async () => {
     if (get().initialized) return
 
-    // Rotas públicas de autenticação por link: não invalidar a sessão estabelecida
-    // pelo token do e-mail de convite ou recuperação de senha.
     const isAuthSetupRoute = ['/definir-senha', '/recuperar-senha']
       .some(p => window.location.pathname.startsWith(p))
 
     try {
+      // 1. Busca a sessão que sobreviveu ao F5 no cache do Supabase
       const { data: { session } } = await supabase.auth.getSession()
+      
       if (session?.user && !isAuthSetupRoute) {
-        // Hardening: nunca reaproveitar sessão pré-existente ao abrir o CRM.
-        void supabase.auth.signOut()
+        // CORREÇÃO: Em vez de destruir a sessão (signOut), recuperamos o perfil ativo
+        const perfil = await fetchPerfil(session.user.id)
+        if (perfil && perfil.status === 'ativo') {
+          set({ user: perfil, supabaseUser: session.user, isAuthenticated: true, hasExplicitLogin: true })
+        } else {
+          void supabase.auth.signOut()
+        }
       }
     } catch {
-      // Sessão/localStorage pode estar corrompido; segue para tela de login.
+      // Falha silenciosa: se o localStorage estiver corrompido, segue para o login
     }
-    set({ user: null, supabaseUser: null, isAuthenticated: false, initialized: true, hasExplicitLogin: false })
 
-    supabase.auth.onAuthStateChange((event, session) => {
+    // 2. Só avisa ao AppLayout que terminou de carregar DEPOIS da verificação acima
+    set({ initialized: true })
+
+    // 3. Listener do Supabase otimizado (sem a trava que impedia o F5)
+    supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session?.user) {
         set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false, isLoading: false })
         return
       }
+      
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (!get().hasExplicitLogin) {
-          // Se esta aba está em /definir-senha ou /recuperar-senha, a sessão foi
-          // estabelecida pelo link do e-mail — deixar o componente da página lidar com ela.
-          if (['/definir-senha', '/recuperar-senha'].some(p => window.location.pathname.startsWith(p))) return
-
-          // Em outras abas (login, dashboard…), recusar a autenticação silenciosa SEM
-          // chamar signOut() no servidor: um signOut() aqui destruiria a sessão de convite
-          // aberta em outra janela/aba via sincronização de localStorage.
-          set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false, isLoading: false })
-          return
-        }
-        void (async () => {
-          try {
-            const perfil = await fetchPerfil(session.user.id)
-            if (perfil && perfil.status === 'ativo') {
-              set({ user: perfil, supabaseUser: session.user, isAuthenticated: true })
-            } else {
-              queueMicrotask(() => {
-                void supabase.auth.signOut()
-              })
-              set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false, isLoading: false })
-            }
-          } catch {
-            queueMicrotask(() => {
-              void supabase.auth.signOut()
-            })
-            set({ user: null, supabaseUser: null, isAuthenticated: false, hasExplicitLogin: false, isLoading: false })
+        try {
+          const perfil = await fetchPerfil(session.user.id)
+          if (perfil && perfil.status === 'ativo') {
+            set({ user: perfil, supabaseUser: session.user, isAuthenticated: true })
+          } else {
+            void supabase.auth.signOut()
+            set({ user: null, supabaseUser: null, isAuthenticated: false })
           }
-        })()
+        } catch {
+          void supabase.auth.signOut()
+          set({ user: null, supabaseUser: null, isAuthenticated: false })
+        }
       }
     })
   },
