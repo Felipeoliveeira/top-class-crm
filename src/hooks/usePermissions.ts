@@ -12,6 +12,7 @@ export function usePermissions() {
     canViewPerformanceTable: isAdmin,
     canViewFinancialKpis: isAdmin,
     canViewAllDashboard: isAdmin,
+    canDeleteLead: isAdmin,
     canInactivateLead: (consultorId: string) => isAdmin || (isConsultor && user?.id === consultorId),
     canMarkAsLost: (consultorId: string) => isAdmin || (isConsultor && user?.id === consultorId),
     canAddInteraction: (consultorId: string) => isAdmin || (isConsultor && user?.id === consultorId),
