@@ -44,7 +44,7 @@ CRM web próprio da Top Class com:
 - **Dashboards personalizados** por perfil com KPIs em tempo real
 - **Gestão documental** integrada via Supabase Storage
 - **Gate de pagamento** — lead só avança para Fechado com status financeiro "Pago"
-- **Histórico imutável** de interações para rastreabilidade completa
+- **Histórico imutável** no uso cotidiano (sem edição ou exclusão isolada de anotações); remoção somente na exclusão integral do lead pelo Admin (RF-24)
 
 ### Diferencial competitivo frente ao mercado
 
@@ -168,8 +168,9 @@ A interface segue o padrão visual já validado pela Top Class:
 | US-22 | Como Consultor, quero ver e editar os dados do lead organizados em seções progressivas (dados básicos, negociação, contratuais, documentos, financeiro), para preencher conforme o avanço no funil | **Must** |
 | US-23 | Como Consultor, quero fazer upload de documentos (DOC, DOCX, JPG, PDF, até 10MB cada) com nome/descrição obrigatória, para anexar comprovantes e contratos ao lead | **Must** |
 | US-24 | Como Consultor, quero registrar interações no histórico do lead com data/hora automáticas, para manter rastreabilidade completa | **Must** |
-| US-25 | Como usuário, quero que o histórico de interações seja imutável (sem edição ou exclusão), para garantir auditabilidade | **Must** |
+| US-25 | Como usuário, quero que o histórico de interações seja imutável no uso cotidiano (sem edição nem exclusão isolada de anotações), para garantir auditabilidade; a remoção de linhas de histórico ocorre somente na exclusão integral do lead pelo Admin (RF-24) | **Must** |
 | US-26 | Como Consultor, quero marcar o checkbox "Pessoa Jurídica" para que campos CNPJ e Razão Social se tornem obrigatórios, para adequar o cadastro ao tipo de cliente | **Must** |
+| US-43 | Como Admin, quero excluir permanentemente um lead após confirmação explícita no detalhe, para atender solicitações legítimas de eliminação de dados (ex.: Art. 18 LGPD) ou remover cadastros claramente incorretos ou duplicados | **Must** |
 
 #### Dashboards
 
@@ -249,11 +250,11 @@ A interface segue o padrão visual já validado pela Top Class:
 |----|-----------|---------------------|--------|
 | RF-18 | Seções progressivas no detalhe | 1. Seção Dados Básicos: sempre visível (Nome, Telefone, Consultor, Data, Status). 2. Seção Qualificação: visível a partir de Atendimento para preenchimento, exibida a partir de Negociação (Origem, Necessidade/Interesse). 3. Seção Negociação e Contratuais: visível a partir de Negociação para preenchimento, exibida a partir de Fechado (Serviço de Interesse, Valor Bruto, Desconto %, Valor Líquido read-only, E-mail, RG, CPF, Contato, checkbox PJ → CNPJ + Razão Social, Sócios). 4. Seção Documentos. 5. Seção Status Financeiro. 6. Seção Histórico de Interações | **Must** |
 | RF-19 | Upload de documentos | 1. Área de upload com drag-and-drop. 2. Campo nome/descrição obrigatório por arquivo. 3. Comprovante de residência obrigatório para avançar a Fechado. 4. Formatos aceitos: DOC, DOCX, JPG, PDF. 5. Limite: 10MB por arquivo. 6. Quantidade ilimitada de arquivos. 7. Lista exibe nome, formato, data e botão de download. 8. Armazenamento via Supabase Storage. 9. Acesso: Consultor responsável + Admin | **Must** |
-| RF-20 | Histórico de interações | 1. Timeline vertical com anotações ordenadas cronologicamente. 2. Cada registro exibe: data, hora, nome do autor, texto. 3. Campo de nova anotação + botão "Registrar". 4. `created_at` automático do servidor. 5. Sem edição ou exclusão de registros (imutabilidade via RLS). 6. Admin pode registrar em qualquer lead; Consultor apenas nos seus | **Must** |
+| RF-20 | Histórico de interações | 1. Timeline vertical com anotações ordenadas cronologicamente. 2. Cada registro exibe: data, hora, nome do autor, texto. 3. Campo de nova anotação + botão "Registrar". 4. `created_at` automático do servidor. 5. Sem edição nem exclusão **isolada** de registros (imutabilidade via RLS); exclusão de linhas ocorre apenas quando o Admin exclui o lead inteiro (RF-24). 6. Admin pode registrar em qualquer lead; Consultor apenas nos seus | **Must** |
 | RF-21 | Checkbox Pessoa Jurídica | 1. Ao ativar, campos CNPJ e Razão Social tornam-se obrigatórios. 2. Ao desativar, campos CNPJ e Razão Social voltam a ser opcionais (nullable) | **Must** |
 | RF-22 | Gestão de sócios | 1. Botão "+ Adicionar Sócio" disponível no detalhe. 2. Campos por sócio: nome e contato. 3. Armazenamento em JSONB (`socios`). 4. Opcional — não impede avanço de etapa | **Must** |
 | RF-23 | Status financeiro | 1. Toggle Pago/Pendente. 2. Campo numérico dia previsto para pagamento (1 a 31). 3. Se Pendente: alerta vermelho "⚠ Pagamento pendente — lead não pode ser fechado." 4. Alteração de Pendente → Pago libera o avanço para Fechado | **Must** |
-| RF-24 | Ações fixas no rodapé do detalhe | 1. "Avançar Etapa" — ativo/inativo conforme regras de negócio. 2. "Marcar como Perdido" — disponível em Atendimento e Negociação. 3. "Inativar Cliente" — disponível apenas em Fechado. 4. "Salvar" — salva dados editados sem mudar status | **Must** |
+| RF-24 | Ações fixas no rodapé do detalhe | 1. "Avançar Etapa" — ativo/inativo conforme regras de negócio. 2. "Marcar como Perdido" — disponível em Atendimento e Negociação. 3. "Inativar Cliente" — disponível apenas em Fechado. 4. "Salvar" — salva dados editados sem mudar status. 5. "Excluir lead" — **Admin exclusivo** (botão oculto para Consultor na UI; backend valida `role = admin`). Modal de confirmação obrigatório com aviso de irreversibilidade. Remove permanentemente o registro do lead e os dados associados: arquivos no Supabase Storage (`documentos-leads`), linhas em `documentos_lead`, `historico_interacoes` e `pipeline_logs`. Execução via função Postgres (`fn_excluir_lead_admin`) com política de DELETE no Storage apenas para Admin. Após sucesso, redireciona o usuário para a tela do pipeline | **Must** |
 
 ### Módulo 5: Dashboards
 
@@ -285,7 +286,7 @@ A interface segue o padrão visual já validado pela Top Class:
 
 | ID | Descrição | Critérios de Aceite | MoSCoW |
 |----|-----------|---------------------|--------|
-| RF-36 | Pipeline logs via trigger | 1. Toda alteração de `leads.status` gera registro automático em `pipeline_logs`. 2. Campos: lead_id, executado_por, status_anterior, status_novo, observacao, created_at. 3. Tabela somente leitura — inserção apenas via trigger Postgres. 4. Nenhum perfil tem permissão de UPDATE ou DELETE | **Must** |
+| RF-36 | Pipeline logs via trigger | 1. Toda alteração de `leads.status` gera registro automático em `pipeline_logs`. 2. Campos: lead_id, executado_por, status_anterior, status_novo, observacao, created_at. 3. Tabela somente leitura para usuários — inserção apenas via trigger Postgres. 4. Nenhum perfil tem permissão direta de UPDATE ou DELETE via RLS; remoção de linhas de `pipeline_logs` ocorre somente em cascata quando o Admin exclui o lead via `fn_excluir_lead_admin` (RF-24) | **Must** |
 | RF-37 | Log de exportações CSV | 1. Cada exportação CSV gera registro em `exportacoes_log`. 2. Campos: exportado_por (Admin), total_registros, filtros_aplicados (JSONB), created_at. 3. Somente Admin tem SELECT e INSERT | **Must** |
 | RF-38 | Atualização automática de `ultima_movimentacao_at` | 1. Trigger Postgres atualiza `leads.ultima_movimentacao_at` quando: (a) `leads.status` é alterado, ou (b) novo registro inserido em `historico_interacoes` para o lead. 2. Campo não editável pelo frontend | **Must** |
 
@@ -312,7 +313,7 @@ A interface segue o padrão visual já validado pela Top Class:
 | RNF-08 | Rate limiting de APIs | Configuração na Vercel | Rate limiting padrão da Vercel para chamadas ao banco, prevenindo sobrecarga |
 | RNF-09 | RLS (Row Level Security) | Supabase RLS | Todas as tabelas com políticas RLS ativas conforme definido na Seção 6. Consultor nunca acessa dados de outro consultor |
 | RNF-10 | Isolamento de arquivos no Storage | Supabase Storage + RLS | Consultor acessa apenas documentos dos seus leads. Admin acessa todos |
-| RNF-11 | Imutabilidade do histórico | RLS sem UPDATE/DELETE em `historico_interacoes` | Nenhum perfil (nem Admin) consegue editar ou excluir registros de interação |
+| RNF-11 | Imutabilidade do histórico | RLS sem UPDATE/DELETE direto em `historico_interacoes` | Nenhum perfil consegue editar ou apagar anotações isoladamente. A remoção de interações ocorre apenas quando o Admin exclui o lead inteiro (RF-24), via função Postgres com privilégios elevados |
 | RNF-12 | Acesso individual e intransferível | Autenticação por e-mail/senha | Cada usuário possui credenciais únicas. Sem login compartilhado |
 
 ### 5.3 LGPD (Lei Geral de Proteção de Dados)
@@ -322,10 +323,10 @@ A interface segue o padrão visual já validado pela Top Class:
 | RNF-13 | Minimização de dados | Campos obrigatórios apenas quando necessários por etapa | Cadastro exige apenas nome e telefone. Origem e interesse coletados na Negociação. Dados pessoais (RG, CPF, CNPJ), dados de serviço (serviço de interesse, valor) e documentos coletados apenas na fase de Fechado, não antecipadamente |
 | RNF-14 | Controle de acesso a dados sensíveis | RLS + perfis de acesso | RG, CPF e CNPJ acessíveis apenas pelo Consultor responsável e Admin. Sem acesso cruzado entre consultores |
 | RNF-15 | Rastreabilidade de acesso e exportação | `exportacoes_log` + `pipeline_logs` | Toda exportação CSV (que inclui dados sensíveis) é registrada com identificação do Admin, timestamp e filtros aplicados |
-| RNF-16 | Retenção e preservação de dados | Dados mantidos indefinidamente | Leads perdidos, inativos e desativados preservam todos os dados para auditoria e BI. Sem exclusão física |
+| RNF-16 | Retenção e preservação de dados | Padrão: dados mantidos indefinidamente | Leads perdidos e inativos preservam todos os dados para auditoria e BI. **Exceção:** o Admin pode excluir permanentemente um lead específico (RF-24), removendo lead, histórico, documentos (Storage + metadados) e `pipeline_logs` associados — uso restrito a casos procedentes (ex.: exercício de direitos do titular, duplicidade, erro grave) |
 | RNF-17 | Segurança no armazenamento de documentos | Supabase Storage com RLS | Documentos contratuais (comprovantes, RG, contratos) armazenados com acesso controlado. Sem acesso público |
 | RNF-18 | Exportação CSV com dados sensíveis | Admin exclusivo + log | Exportação restrita ao Admin. Cada exportação gera registro auditável. Funcionalidade indisponível em mobile (reduz risco de exportação em dispositivos menos seguros) |
-| [⚠️ LACUNA] | Direito de exclusão (Art. 18 LGPD) | A definir | O sistema retém dados indefinidamente para auditoria. Caso um titular solicite exclusão de dados pessoais, não há fluxo implementado no MVP. Recomenda-se definir um processo manual para o Admin tratar essas solicitações e avaliar anonimização como alternativa à exclusão para preservar integridade do funil |
+| RNF-18a | Direito de exclusão (Art. 18 LGPD) — atendimento operacional | Exclusão integral pelo Admin (RF-24) + evidência externa | Quando houver solicitação fundamentada do titular (ou decisão interna documentada para duplicidade/erro), o Admin executa a exclusão permanente no detalhe do lead, após confirmação no modal. **Recomenda-se** manter comprovante da solicitação ou decisão **fora do CRM** (protocolo, e-mail, termo), pois o sistema não registra log dedicado de exclusões após a remoção dos dados. Avaliar anonimização parcial em versões futuras quando a exclusão total não for obrigatória |
 | [⚠️ LACUNA] | Termo de consentimento | A definir | Não há registro de consentimento do lead para tratamento dos seus dados pessoais. Recomenda-se avaliar se o consentimento é coletado fora do CRM (ex: formulário de contato, contrato) ou se deve ser incorporado ao sistema em versão futura |
 
 ### 5.4 Acessibilidade
@@ -352,7 +353,7 @@ A interface segue o padrão visual já validado pela Top Class:
 
 | ID | Requisito | Implementação | Critério de Aceite |
 |----|-----------|---------------|-------------------|
-| RNF-29 | Retenção de dados | Indefinida | Todos os dados (leads ativos, perdidos, inativos, histórico, logs) mantidos sem prazo de expiração |
+| RNF-29 | Retenção de dados | Indefinida (com exceção pontual) | Por padrão, todos os dados (leads ativos, perdidos, inativos, histórico, logs) são mantidos sem prazo de expiração. **Exceção:** exclusão permanente de um lead pelo Admin (RF-24), alinhada a RNF-16 e RNF-18a |
 | RNF-30 | Backup | Supabase nativo | Backups diários / Point-in-Time Recovery conforme tier contratado do Supabase. Sem rotina customizada de dump no MVP |
 
 ---
@@ -645,7 +646,7 @@ interacoes  _lead        _logs      (Admin only)
 | # | Risco | Probabilidade | Impacto | Mitigação |
 |---|-------|---------------|---------|-----------|
 | R1 | **Adoção pelo Consultor** — Resistência ao uso do CRM por ser mais trabalhoso que o processo informal atual | Alta | Alto | Pipeline impõe disciplina mínima com poucos campos por etapa. Interface Kanban visual e intuitiva. Treinamento inicial antes do go-live |
-| R2 | **Perda de dados por falha do Supabase** | Baixa | Crítico | Backup diário nativo do Supabase + PITR conforme tier contratado. Dados imutáveis (historico_interacoes, pipeline_logs) como camada adicional de rastreabilidade |
+| R2 | **Perda de dados por falha do Supabase** | Baixa | Crítico | Backup diário nativo do Supabase + PITR conforme tier contratado. Imutabilidade operacional de `historico_interacoes` e `pipeline_logs` (sem alteração pelo usuário) como camada adicional de rastreabilidade; exclusão desses registros só ocorre com exclusão integral do lead pelo Admin (RF-24) |
 | R3 | **Escalação de privilégios** — Consultor tenta acessar dados de outros leads | Média | Alto | RLS implementado no nível do banco (Supabase). Mesmo que o frontend seja comprometido, o banco bloqueia acessos indevidos |
 | R4 | **Vazamento de dados pessoais (LGPD)** — Exportação CSV com CPF/RG cai em mãos erradas | Média | Alto | Exportação restrita ao Admin. Cada exportação logada. CSV indisponível em mobile. [⚠️ LACUNA: considerar criptografia ou mascaramento parcial de CPF/RG no CSV em versões futuras] |
 | R5 | **Token de convite expirado** — Consultor não clica no link em 24h e perde acesso | Média | Baixo | Admin pode reenviar convite com um clique. Visibilidade na tela de Gestão de Usuários |
@@ -674,7 +675,8 @@ Os itens abaixo estão **explicitamente excluídos** do escopo deste PRD e do de
 | Chat interno entre usuários | Sem funcionalidade de comunicação interna |
 | Cálculo automático de comissão | Sem engine de comissionamento |
 | Backup customizado / dump manual | Dependência do backup nativo do Supabase |
-| Exclusão física de leads | Leads são inativados, nunca excluídos. Retenção indefinida para auditoria |
+| Exclusão de leads pelo Consultor | Consultores não excluem leads; podem inativar clientes fechados (RF-10). A exclusão permanente é exclusiva do Admin no detalhe (RF-24) |
+| Exclusão em massa / purge automatizado | Sem ferramenta de exclusão por lote, filtros ou job agendado; apenas exclusão individual confirmada pelo Admin |
 | Importação de leads em massa (CSV/Excel) | Cadastro é individual pelo pipeline. Importação em massa não prevista no MVP |
 
 ---

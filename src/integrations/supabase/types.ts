@@ -329,6 +329,10 @@ export type Database = {
         Args: { p_lead_id: number; p_novo_consultor_id: string }
         Returns: Database["public"]["Tables"]["leads"]["Row"][]
       }
+      fn_excluir_lead_admin: {
+        Args: { p_lead_id: number }
+        Returns: null
+      }
     }
     Enums: {
       formato_doc_enum: "doc" | "docx" | "jpg" | "pdf"

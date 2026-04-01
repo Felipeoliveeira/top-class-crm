@@ -33,7 +33,7 @@ import {
   type Lead, type LeadOrigem, type LeadNecessidade, type ServicoInteresse, type MotivoPerdaTipo, type StatusFinanceiro,
   type HistoricoInteracao, type DocumentoLead, type Perfil
 } from '@/types'
-import { ChevronDown, Save, ArrowRight, XCircle, UserX, Loader2, Plus, X } from 'lucide-react'
+import { ChevronDown, Save, ArrowRight, XCircle, UserX, Loader2, Plus, X, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -68,7 +68,7 @@ export default function LeadDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { canAssignConsultor, canInactivateLead, canMarkAsLost, canAddInteraction } = usePermissions()
+  const { canAssignConsultor, canInactivateLead, canMarkAsLost, canAddInteraction, canDeleteLead } = usePermissions()
 
   const [lead, setLead] = useState<Lead | null>(null)
   const [loading, setLoading] = useState(true)
@@ -77,6 +77,8 @@ export default function LeadDetailPage() {
   const [blockingMsg, setBlockingMsg] = useState('')
   const [blockingOpen, setBlockingOpen] = useState(false)
   const [lossOpen, setLossOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [lossMotive, setLossMotive] = useState<MotivoPerdaTipo | ''>('')
   const [lossDesc, setLossDesc] = useState('')
   const [newNote, setNewNote] = useState('')
@@ -433,6 +435,32 @@ export default function LeadDetailPage() {
     setLossOpen(false)
     invalidateLeadsQueries()
     toast.success('Lead marcado como perdido')
+  }
+
+  const handleDeleteLead = async () => {
+    if (!lead) return
+    setDeleting(true)
+    try {
+      const paths = documentos.map(d => getStoragePathFromArquivoUrl(d.arquivo_url)).filter(p => p.length > 0)
+      if (paths.length > 0) {
+        const { error: storageError } = await supabase.storage.from('documentos-leads').remove(paths)
+        if (storageError) {
+          toast.error(`Erro ao remover arquivos no storage: ${storageError.message}`)
+          setDeleting(false)
+          return
+        }
+      }
+      const { error } = await supabase.rpc('fn_excluir_lead_admin', { p_lead_id: lead.id })
+      if (error) throw new Error(error.message)
+      setDeleteOpen(false)
+      invalidateLeadsQueries()
+      toast.success('Lead excluído')
+      navigate('/pipeline')
+    } catch (err) {
+      toast.error(`Erro ao excluir lead: ${(err as Error).message}`)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const handleAddNote = async () => {
@@ -800,6 +828,31 @@ export default function LeadDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent className="border-border bg-card max-h-[90vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Excluir lead</AlertDialogTitle>
+          </AlertDialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Esta ação não pode ser desfeita. O lead, histórico, documentos e registros de pipeline associados serão removidos permanentemente.
+          </p>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border bg-secondary text-foreground" disabled={deleting}>
+              Cancelar
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+              onClick={() => void handleDeleteLead()}
+            >
+              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Excluir permanentemente
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Rodapé fixo: ações principais (mobile + desktop) */}
       <div className="fixed bottom-0 left-0 right-0 md:left-60 z-30 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85 p-3 shadow-lg">
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-end gap-2">
@@ -834,6 +887,16 @@ export default function LeadDetailPage() {
               }}
             >
               <UserX className="mr-2 h-4 w-4" /> Inativar cliente
+            </Button>
+          )}
+          {canDeleteLead && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-destructive text-destructive shrink-0"
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Excluir lead
             </Button>
           )}
         </div>
