@@ -19,6 +19,35 @@ export const ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
   inativo: [],
 }
 
+/** Campos editáveis do lead para `update` (exceto `status`). */
+export function leadPersistPayload(lead: Lead) {
+  return {
+    nome: lead.nome,
+    telefone: lead.telefone,
+    origem: lead.origem,
+    necessidade: lead.necessidade,
+    consultor_id: lead.consultor_id,
+    servico_interesse: lead.servico_interesse,
+    valor_bruto: lead.valor_bruto,
+    porcentagem_desconto: lead.porcentagem_desconto,
+    valor_liquido: lead.valor_liquido,
+    email: lead.email,
+    rg: lead.rg,
+    cpf: lead.cpf,
+    cnpj: lead.cnpj,
+    razao_social: lead.razao_social,
+    contato_numero: lead.contato_numero,
+    socios: lead.socios,
+    status_financeiro: lead.status_financeiro,
+    data_prevista_pagamento: lead.data_prevista_pagamento,
+    data_inicio_contrato: lead.data_inicio_contrato,
+    data_fim_contrato: lead.data_fim_contrato,
+    possui_nota_fiscal: lead.possui_nota_fiscal,
+    motivo_perda_tipo: lead.motivo_perda_tipo,
+    motivo_perda_descricao: lead.motivo_perda_descricao,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Erros customizados
 // ---------------------------------------------------------------------------
@@ -51,7 +80,7 @@ export function isTransitionAllowed(from: LeadStatus, to: LeadStatus): boolean {
 export function validateAtendimentoToNegociacao(lead: Lead): string[] {
   const missing: string[] = []
   if (!lead.origem) missing.push('Origem')
-  if (!lead.necessidade) missing.push('Necessidade')
+  if (!lead.necessidade) missing.push('Serviço de Interesse')
   return missing
 }
 
@@ -59,7 +88,7 @@ export function validateAtendimentoToNegociacao(lead: Lead): string[] {
 export async function validateNegociacaoToFechado(lead: Lead): Promise<string[]> {
   const missing: string[] = []
 
-  if (!lead.servico_interesse) missing.push('Serviço de Interesse')
+  if (!lead.servico_interesse) missing.push('Plano')
   if (!lead.valor_bruto) missing.push('Valor Bruto')
   if (!lead.email) missing.push('E-mail')
   if (!lead.rg) missing.push('RG')
@@ -77,6 +106,23 @@ export async function validateNegociacaoToFechado(lead: Lead): Promise<string[]>
 
   // Status financeiro = pago
   if (lead.status_financeiro !== 'pago') missing.push('Status Financeiro = Pago')
+
+  const venc = lead.data_prevista_pagamento
+  if (venc == null || venc < 1 || venc > 31) missing.push('Vencimento')
+
+  if (!lead.data_inicio_contrato?.trim()) missing.push('Data início do contrato')
+  if (!lead.data_fim_contrato?.trim()) missing.push('Data fim do contrato')
+  if (
+    lead.data_inicio_contrato &&
+    lead.data_fim_contrato &&
+    lead.data_fim_contrato < lead.data_inicio_contrato
+  ) {
+    missing.push('Data fim do contrato deve ser igual ou posterior à data de início')
+  }
+
+  if (lead.possui_nota_fiscal !== true && lead.possui_nota_fiscal !== false) {
+    missing.push('Possui Nota Fiscal?')
+  }
 
   return missing
 }
@@ -173,7 +219,10 @@ export async function advanceStage(lead: Lead, targetStatus: LeadStatus): Promis
 
   const { data, error } = await supabase
     .from('leads')
-    .update({ status: targetStatus })
+    .update({
+      ...leadPersistPayload(lead),
+      status: targetStatus,
+    })
     .eq('id', lead.id)
     .select()
     .single()

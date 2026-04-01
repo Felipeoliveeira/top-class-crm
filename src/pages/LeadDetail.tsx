@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -27,7 +28,7 @@ import { PIPELINE_QUERY_KEYS } from '@/hooks/usePipeline'
 import { invalidateDashboardQueries } from '@/hooks/useDashboard'
 import { usePermissions } from '@/hooks/usePermissions'
 import { supabase } from '@/integrations/supabase/client'
-import { calculateValorLiquido, inactivateLead as inactivateLeadService } from '@/services/pipeline'
+import { calculateValorLiquido, inactivateLead as inactivateLeadService, leadPersistPayload } from '@/services/pipeline'
 import {
   LEAD_ORIGEM_LABELS, LEAD_NECESSIDADE_LABELS, SERVICO_LABELS, MOTIVO_PERDA_LABELS,
   type Lead, type LeadOrigem, type LeadNecessidade, type ServicoInteresse, type MotivoPerdaTipo, type StatusFinanceiro,
@@ -224,6 +225,11 @@ export default function LeadDetailPage() {
 
   if (!lead) return <div className="p-8 text-center text-muted-foreground">Lead não encontrado</div>
 
+  const buildLeadPersistFields = () => ({
+    ...leadPersistPayload(lead),
+    socios: socios.length > 0 ? socios : null,
+  })
+
   const updateField = <K extends keyof Lead>(field: K, value: Lead[K]) => {
     setLead(prev => {
       if (!prev) return prev
@@ -303,27 +309,8 @@ export default function LeadDetailPage() {
     }
 
     const { error } = await supabase.from('leads').update({
-      nome: lead.nome,
-      telefone: lead.telefone,
-      origem: lead.origem,
-      necessidade: lead.necessidade,
-      consultor_id: lead.consultor_id,
-      servico_interesse: lead.servico_interesse,
-      valor_bruto: lead.valor_bruto,
-      porcentagem_desconto: lead.porcentagem_desconto,
-      valor_liquido: lead.valor_liquido,
-      email: lead.email,
-      rg: lead.rg,
-      cpf: lead.cpf,
-      cnpj: lead.cnpj,
-      razao_social: lead.razao_social,
-      contato_numero: lead.contato_numero,
-      socios: socios.length > 0 ? socios : null,
-      status_financeiro: lead.status_financeiro,
-      data_prevista_pagamento: lead.data_prevista_pagamento,
+      ...buildLeadPersistFields(),
       status: lead.status,
-      motivo_perda_tipo: lead.motivo_perda_tipo,
-      motivo_perda_descricao: lead.motivo_perda_descricao,
     }).eq('id', lead.id)
 
     setSaving(false)
@@ -344,9 +331,9 @@ export default function LeadDetailPage() {
 
     if (lead.status === 'atendimento') {
       if (!lead.origem) missing.push('Origem')
-      if (!lead.necessidade) missing.push('Necessidade Identificada')
+      if (!lead.necessidade) missing.push('Serviço de Interesse')
     } else if (lead.status === 'negociacao') {
-      if (!lead.servico_interesse) missing.push('Serviço de Interesse')
+      if (!lead.servico_interesse) missing.push('Plano')
       if (!lead.valor_bruto) missing.push('Valor Bruto')
       if (!lead.email) missing.push('E-mail')
       if (!lead.rg) missing.push('RG')
@@ -360,6 +347,20 @@ export default function LeadDetailPage() {
         setBlockingMsg('O status financeiro deve estar como "Pago" para avançar.')
         setBlockingOpen(true)
         return false
+      }
+      const venc = lead.data_prevista_pagamento
+      if (venc == null || venc < 1 || venc > 31) missing.push('Vencimento')
+      if (!lead.data_inicio_contrato?.trim()) missing.push('Data início do contrato')
+      if (!lead.data_fim_contrato?.trim()) missing.push('Data fim do contrato')
+      if (
+        lead.data_inicio_contrato &&
+        lead.data_fim_contrato &&
+        lead.data_fim_contrato < lead.data_inicio_contrato
+      ) {
+        missing.push('Data fim do contrato deve ser igual ou posterior à data de início')
+      }
+      if (lead.possui_nota_fiscal !== true && lead.possui_nota_fiscal !== false) {
+        missing.push('Possui Nota Fiscal?')
       }
     }
 
@@ -387,7 +388,10 @@ export default function LeadDetailPage() {
     if (!validateAdvance(persistedDocsCount)) return
     const nextStatus = lead.status === 'atendimento' ? 'negociacao' : lead.status === 'negociacao' ? 'fechado' : lead.status
 
-    const { error } = await supabase.from('leads').update({ status: nextStatus }).eq('id', lead.id)
+    const { error } = await supabase.from('leads').update({
+      ...buildLeadPersistFields(),
+      status: nextStatus,
+    }).eq('id', lead.id)
     if (error) {
       toast.error('Erro ao avançar: ' + error.message)
       return
@@ -557,7 +561,7 @@ export default function LeadDetailPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-foreground">Necessidade identificada</Label>
+              <Label className="text-foreground">Serviço de Interesse</Label>
               <Select value={lead.necessidade || ''} onValueChange={v => updateField('necessidade', v as LeadNecessidade)}>
                 <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent className="bg-card border-border">
@@ -579,7 +583,7 @@ export default function LeadDetailPage() {
           <CollapsibleContent className="rounded-b-lg border border-t-0 border-border bg-card p-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2 md:col-span-2">
-                <Label className="text-foreground">Serviço de Interesse</Label>
+                <Label className="text-foreground">Plano</Label>
                 <Select value={lead.servico_interesse || ''} onValueChange={v => updateField('servico_interesse', v as ServicoInteresse)}>
                   <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent className="bg-card border-border">
@@ -721,8 +725,53 @@ export default function LeadDetailPage() {
               </div>
             </div>
             <div className="space-y-2 max-w-xs">
-              <Label className="text-foreground">Dia previsto para pagamento</Label>
-              <Input type="number" min={1} max={31} value={lead.data_prevista_pagamento || ''} onChange={e => updateField('data_prevista_pagamento', Number(e.target.value) || null)} className="bg-background border-border" />
+              <Label className="text-foreground">Vencimento</Label>
+              <Input type="number" min={1} max={31} required placeholder="Dia do mês (1–31)" value={lead.data_prevista_pagamento ?? ''} onChange={e => updateField('data_prevista_pagamento', Number(e.target.value) || null)} className="bg-background border-border" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-foreground">Data início do contrato</Label>
+                <Input
+                  type="date"
+                  required
+                  value={lead.data_inicio_contrato ?? ''}
+                  onChange={e => updateField('data_inicio_contrato', e.target.value.trim() || null)}
+                  className="bg-background border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-foreground">Data fim do contrato</Label>
+                <Input
+                  type="date"
+                  required
+                  value={lead.data_fim_contrato ?? ''}
+                  onChange={e => updateField('data_fim_contrato', e.target.value.trim() || null)}
+                  className="bg-background border-border"
+                />
+              </div>
+            </div>
+            <div className="space-y-3">
+              <Label className="text-foreground">Possui Nota Fiscal?</Label>
+              <RadioGroup
+                value={
+                  lead.possui_nota_fiscal === true ? 'sim' : lead.possui_nota_fiscal === false ? 'nao' : ''
+                }
+                onValueChange={v => updateField('possui_nota_fiscal', v === 'sim')}
+                className="flex flex-row flex-wrap items-center gap-6"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="sim" id="nf-sim" />
+                  <Label htmlFor="nf-sim" className="text-foreground font-normal cursor-pointer">
+                    Sim
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="nao" id="nf-nao" />
+                  <Label htmlFor="nf-nao" className="text-foreground font-normal cursor-pointer">
+                    Não
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
             {lead.status_financeiro === 'pendente' && (
               <div className="flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/20 p-3">

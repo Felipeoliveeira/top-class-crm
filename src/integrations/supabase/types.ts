@@ -140,6 +140,8 @@ export type Database = {
           contato_numero: string | null
           cpf: string | null
           created_at: string
+          data_fim_contrato: string | null
+          data_inicio_contrato: string | null
           data_prevista_pagamento: number | null
           email: string | null
           id: number
@@ -151,6 +153,7 @@ export type Database = {
           nome: string
           origem: Database["public"]["Enums"]["origem_enum"] | null
           porcentagem_desconto: number | null
+          possui_nota_fiscal: boolean | null
           razao_social: string | null
           rg: string | null
           servico_interesse: Database["public"]["Enums"]["servico_enum"] | null
@@ -171,6 +174,8 @@ export type Database = {
           contato_numero?: string | null
           cpf?: string | null
           created_at?: string
+          data_fim_contrato?: string | null
+          data_inicio_contrato?: string | null
           data_prevista_pagamento?: number | null
           email?: string | null
           id?: never
@@ -182,6 +187,7 @@ export type Database = {
           nome: string
           origem?: Database["public"]["Enums"]["origem_enum"] | null
           porcentagem_desconto?: number | null
+          possui_nota_fiscal?: boolean | null
           razao_social?: string | null
           rg?: string | null
           servico_interesse?: Database["public"]["Enums"]["servico_enum"] | null
@@ -202,6 +208,8 @@ export type Database = {
           contato_numero?: string | null
           cpf?: string | null
           created_at?: string
+          data_fim_contrato?: string | null
+          data_inicio_contrato?: string | null
           data_prevista_pagamento?: number | null
           email?: string | null
           id?: never
@@ -213,6 +221,7 @@ export type Database = {
           nome?: string
           origem?: Database["public"]["Enums"]["origem_enum"] | null
           porcentagem_desconto?: number | null
+          possui_nota_fiscal?: boolean | null
           razao_social?: string | null
           rg?: string | null
           servico_interesse?: Database["public"]["Enums"]["servico_enum"] | null
