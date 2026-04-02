@@ -113,22 +113,74 @@ Deno.serve(async (req) => {
         )
       }
 
+      // 1) Convite admin: só cria/envia para e-mail ainda inexistente em auth.
       const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         data: { nome_completo: perfil.nome_completo, role: perfil.role },
         redirectTo,
       })
 
-      if (inviteError) {
+      if (!inviteError) {
+        return new Response(JSON.stringify({ success: true, message: 'Convite reenviado com sucesso!' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // 2) Reenvio típico: usuário já existe em auth (primeiro convite já consumiu o e-mail).
+      // inviteUserByEmail retorna "already been registered" — usar recuperação de senha com o
+      // mesmo redirectTo para abrir /definir-senha (SetPassword trata PASSWORD_RECOVERY).
+      const msg = (inviteError.message ?? '').toLowerCase()
+      const isAlreadyRegistered =
+        msg.includes('already been registered') ||
+        msg.includes('already registered') ||
+        msg.includes('user already registered')
+
+      if (!isAlreadyRegistered) {
         return new Response(JSON.stringify({ error: inviteError.message }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      return new Response(JSON.stringify({ success: true, message: 'Convite reenviado com sucesso!' }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      if (!anonKey) {
+        return new Response(
+          JSON.stringify({
+            error: 'SUPABASE_ANON_KEY ausente na Edge Function (necessário para reenvio após convite inicial).',
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      const supabaseAnon = createClient(Deno.env.get('SUPABASE_URL') ?? '', anonKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
       })
+
+      const { error: recoveryError } = await supabaseAnon.auth.resetPasswordForEmail(email, {
+        redirectTo,
+      })
+
+      if (recoveryError) {
+        return new Response(JSON.stringify({ error: recoveryError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message:
+            'Novo link enviado por e-mail (recuperação de senha). Abra o link para definir a senha em /definir-senha.',
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
     // -------------------------------------------------------------------------

@@ -66,7 +66,7 @@ export default function UsersPage() {
   const handleResend = async (u: Perfil) => {
     try {
       await resendMutation.mutateAsync(u.email)
-      toast.success('Novo convite enviado por e-mail.')
+      toast.success('Novo link enviado por e-mail. Abra o link para concluir o cadastro em /definir-senha.')
     } catch (e) {
       toast.error((e as Error).message || 'Erro ao reenviar convite')
     }
