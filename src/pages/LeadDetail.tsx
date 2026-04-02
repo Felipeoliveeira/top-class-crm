@@ -36,6 +36,18 @@ import {
 } from '@/types'
 import { ChevronDown, Save, ArrowRight, XCircle, UserX, Loader2, Plus, X, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  formatCnpj,
+  formatCpf,
+  formatTelefoneBrMobile,
+  isValidCnpj,
+  isValidCpf,
+  isValidEmailBr,
+  isValidRg,
+  isValidTelefoneBrMobile,
+  normalizeEmailInput,
+  sanitizeRgInput,
+} from '@/lib/br-inputs'
 import { cn } from '@/lib/utils'
 
 type UploadedLeadFile = { file: File; nome_descricao: string }
@@ -294,6 +306,26 @@ export default function LeadDetailPage() {
 
   const handleSave = async () => {
     if (!lead) return
+
+    const saveErrors: string[] = []
+    if (!isValidTelefoneBrMobile(lead.telefone)) {
+      saveErrors.push('Telefone: use celular válido (DD) 9XXXX-XXXX')
+    }
+    const em = lead.email?.trim()
+    if (em && !isValidEmailBr(em)) saveErrors.push('E-mail inválido')
+    const rg = lead.rg?.trim()
+    if (rg && !isValidRg(rg)) saveErrors.push('RG inválido')
+    const cpf = lead.cpf?.trim()
+    if (cpf && !isValidCpf(cpf)) saveErrors.push('CPF inválido')
+    if (isPJ) {
+      const cnpj = lead.cnpj?.trim()
+      if (cnpj && !isValidCnpj(cnpj)) saveErrors.push('CNPJ inválido')
+    }
+    if (saveErrors.length > 0) {
+      toast.error(saveErrors.join(' · '))
+      return
+    }
+
     setSaving(true)
     let persistedDocsCount = 0
     try {
@@ -332,13 +364,20 @@ export default function LeadDetailPage() {
     if (lead.status === 'atendimento') {
       if (!lead.origem) missing.push('Origem')
       if (!lead.necessidade) missing.push('Serviço de Interesse')
+      if (!isValidTelefoneBrMobile(lead.telefone)) {
+        missing.push('Telefone (celular válido: (DD) 9XXXX-XXXX)')
+      }
     } else if (lead.status === 'negociacao') {
       if (!lead.servico_interesse) missing.push('Plano')
       if (!lead.valor_bruto) missing.push('Valor Bruto')
       if (!lead.email) missing.push('E-mail')
+      else if (!isValidEmailBr(lead.email)) missing.push('E-mail (formato inválido)')
       if (!lead.rg) missing.push('RG')
+      else if (!isValidRg(lead.rg)) missing.push('RG (inválido)')
       if (!lead.cpf) missing.push('CPF')
+      else if (!isValidCpf(lead.cpf)) missing.push('CPF (inválido)')
       if (isPJ && !lead.cnpj) missing.push('CNPJ')
+      else if (isPJ && lead.cnpj && !isValidCnpj(lead.cnpj)) missing.push('CNPJ (inválido)')
       if (isPJ && !lead.razao_social) missing.push('Razão Social')
       const totalDocs = documentos.length + persistedDocsCount
       if (totalDocs === 0) missing.push('Ao menos 1 documento enviado')
@@ -520,7 +559,14 @@ export default function LeadDetailPage() {
             </div>
             <div className="space-y-2">
               <Label className="text-foreground">Telefone</Label>
-              <Input value={lead.telefone} onChange={e => updateField('telefone', e.target.value)} className="bg-background border-border" />
+              <Input
+                value={lead.telefone}
+                onChange={e => updateField('telefone', formatTelefoneBrMobile(e.target.value))}
+                placeholder="(00) 00000-0000"
+                inputMode="numeric"
+                autoComplete="tel"
+                className="bg-background border-border"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-foreground">Responsável</Label>
@@ -619,15 +665,32 @@ export default function LeadDetailPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-foreground">E-mail</Label>
-                <Input value={lead.email || ''} onChange={e => updateField('email', e.target.value)} className="bg-background border-border" />
+                <Input
+                  type="email"
+                  value={lead.email || ''}
+                  onChange={e => updateField('email', normalizeEmailInput(e.target.value) || null)}
+                  autoComplete="email"
+                  className="bg-background border-border"
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-foreground">RG</Label>
-                <Input value={lead.rg || ''} onChange={e => updateField('rg', e.target.value)} className="bg-background border-border" />
+                <Input
+                  value={lead.rg || ''}
+                  onChange={e => updateField('rg', sanitizeRgInput(e.target.value) || null)}
+                  placeholder="Somente números; letra só no DV (ex: …X)"
+                  className="bg-background border-border"
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-foreground">CPF</Label>
-                <Input value={lead.cpf || ''} onChange={e => updateField('cpf', e.target.value)} placeholder="000.000.000-00" className="bg-background border-border" />
+                <Input
+                  value={lead.cpf || ''}
+                  onChange={e => updateField('cpf', formatCpf(e.target.value) || null)}
+                  placeholder="000.000.000-00"
+                  inputMode="numeric"
+                  className="bg-background border-border"
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-foreground">Contato Adicional</Label>
@@ -644,7 +707,13 @@ export default function LeadDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-foreground">CNPJ</Label>
-                  <Input value={lead.cnpj || ''} onChange={e => updateField('cnpj', e.target.value)} placeholder="00.000.000/0001-00" className="bg-background border-border" />
+                  <Input
+                    value={lead.cnpj || ''}
+                    onChange={e => updateField('cnpj', formatCnpj(e.target.value) || null)}
+                    placeholder="00.000.000/0001-00"
+                    inputMode="numeric"
+                    className="bg-background border-border"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-foreground">Razão Social</Label>

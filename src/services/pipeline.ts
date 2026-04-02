@@ -1,4 +1,11 @@
 import { supabase } from '@/integrations/supabase/client'
+import {
+  isValidCnpj,
+  isValidCpf,
+  isValidEmailBr,
+  isValidRg,
+  isValidTelefoneBrMobile,
+} from '@/lib/br-inputs'
 import type { Lead, LeadStatus, MotivoPerdaTipo, Perfil } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -81,6 +88,9 @@ export function validateAtendimentoToNegociacao(lead: Lead): string[] {
   const missing: string[] = []
   if (!lead.origem) missing.push('Origem')
   if (!lead.necessidade) missing.push('Serviço de Interesse')
+  if (!isValidTelefoneBrMobile(lead.telefone)) {
+    missing.push('Telefone (celular válido: (DD) 9XXXX-XXXX)')
+  }
   return missing
 }
 
@@ -91,11 +101,19 @@ export async function validateNegociacaoToFechado(lead: Lead): Promise<string[]>
   if (!lead.servico_interesse) missing.push('Plano')
   if (!lead.valor_bruto) missing.push('Valor Bruto')
   if (!lead.email) missing.push('E-mail')
+  else if (!isValidEmailBr(lead.email)) missing.push('E-mail (formato inválido)')
+
   if (!lead.rg) missing.push('RG')
+  else if (!isValidRg(lead.rg)) missing.push('RG (inválido)')
+
   if (!lead.cpf) missing.push('CPF')
+  else if (!isValidCpf(lead.cpf)) missing.push('CPF (inválido)')
 
   // PJ: se CNPJ preenchido, razão social é obrigatória
-  if (lead.cnpj && !lead.razao_social) missing.push('Razão Social (PJ)')
+  if (lead.cnpj) {
+    if (!isValidCnpj(lead.cnpj)) missing.push('CNPJ (inválido)')
+    if (!lead.razao_social) missing.push('Razão Social (PJ)')
+  }
 
   // Ao menos 1 documento no Storage
   const { count } = await supabase

@@ -35,6 +35,7 @@ import {
 } from '@/types'
 import { Plus, GripVertical, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { formatTelefoneBrMobile, telefoneBrMobileSchema } from '@/lib/br-inputs'
 import { cn } from '@/lib/utils'
 import {
   DndContext,
@@ -75,7 +76,7 @@ const headerColors: Record<LeadStatus, string> = {
 
 const createLeadSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
-  telefone: z.string().min(1, 'Telefone é obrigatório'),
+  telefone: telefoneBrMobileSchema,
 })
 
 // ---------------------------------------------------------------------------
@@ -448,7 +449,14 @@ export default function PipelinePage() {
             </div>
             <div className="space-y-2">
               <Label className="text-foreground">Telefone *</Label>
-              <Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" className="bg-background border-border" />
+              <Input
+                value={telefone}
+                onChange={e => setTelefone(formatTelefoneBrMobile(e.target.value))}
+                placeholder="(00) 00000-0000"
+                inputMode="numeric"
+                autoComplete="tel"
+                className="bg-background border-border"
+              />
             </div>
             {canAssignConsultor && (
               <div className="space-y-2">
