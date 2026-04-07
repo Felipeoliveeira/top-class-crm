@@ -17,6 +17,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   google: { label: 'Google', className: 'bg-info/20 text-info border-info/30' },
   placa: { label: 'Placa', className: 'bg-warning/20 text-warning border-warning/30' },
   rede_social: { label: 'Rede Social', className: 'bg-success/20 text-success border-success/30' },
+  outros: { label: 'Outros', className: 'bg-muted text-muted-foreground border-border' },
 }
 
 interface StatusBadgeProps {
