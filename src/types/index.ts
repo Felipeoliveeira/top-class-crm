@@ -45,6 +45,10 @@ export interface Lead {
   possui_nota_fiscal: boolean | null
   motivo_perda_tipo: MotivoPerdaTipo | null
   motivo_perda_descricao: string | null
+  /** Preenchido apenas quando origem = 'indicacao' */
+  indicacao_responsavel_nome: string | null
+  /** Preenchido apenas quando origem = 'indicacao', formato (XX) XXXXX-XXXX */
+  indicacao_responsavel_telefone: string | null
   created_at: string
   updated_at: string
   ultima_movimentacao_at: string | null
