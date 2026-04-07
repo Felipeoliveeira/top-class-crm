@@ -1,6 +1,6 @@
 export type Role = 'admin' | 'consultor'
 export type LeadStatus = 'atendimento' | 'negociacao' | 'fechado' | 'perdido' | 'inativo'
-export type LeadOrigem = 'indicacao' | 'google' | 'placa' | 'rede_social'
+export type LeadOrigem = 'indicacao' | 'google' | 'placa' | 'rede_social' | 'outros'
 export type LeadNecessidade = 'escritorio_virtual' | 'salas' | 'endereco_fiscal' | 'coworking'
 export type ServicoInteresse = 'plano_pro' | 'plano_premium' | 'plano_top' | 'coworking' | 'sala_special_room' | 'mini_sala_reuniao' | 'sala_reuniao_8' | 'sala_reuniao_12' | 'salas_fixas'
 export type StatusFinanceiro = 'pago' | 'pendente'
@@ -45,6 +45,10 @@ export interface Lead {
   possui_nota_fiscal: boolean | null
   motivo_perda_tipo: MotivoPerdaTipo | null
   motivo_perda_descricao: string | null
+  /** Preenchido apenas quando origem = 'indicacao' */
+  indicacao_responsavel_nome: string | null
+  /** Preenchido apenas quando origem = 'indicacao', formato (XX) XXXXX-XXXX */
+  indicacao_responsavel_telefone: string | null
   created_at: string
   updated_at: string
   ultima_movimentacao_at: string | null
@@ -83,7 +87,11 @@ export const LEAD_ORIGEM_LABELS: Record<LeadOrigem, string> = {
   google: 'Google',
   placa: 'Placa',
   rede_social: 'Rede Social',
+  outros: 'Outros',
 }
+
+/** Ordem das barras em Leads por Origem / Clientes por Origem no dashboard */
+export const LEAD_ORIGEM_ORDER: LeadOrigem[] = ['indicacao', 'google', 'placa', 'rede_social', 'outros']
 
 export const LEAD_NECESSIDADE_LABELS: Record<LeadNecessidade, string> = {
   escritorio_virtual: 'Escritório Virtual',
