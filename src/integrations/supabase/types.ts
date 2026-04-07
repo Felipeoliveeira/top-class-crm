@@ -145,6 +145,8 @@ export type Database = {
           data_prevista_pagamento: number | null
           email: string | null
           id: number
+          indicacao_responsavel_nome: string | null
+          indicacao_responsavel_telefone: string | null
           motivo_perda_descricao: string | null
           motivo_perda_tipo:
             | Database["public"]["Enums"]["motivo_perda_enum"]
@@ -179,6 +181,8 @@ export type Database = {
           data_prevista_pagamento?: number | null
           email?: string | null
           id?: never
+          indicacao_responsavel_nome?: string | null
+          indicacao_responsavel_telefone?: string | null
           motivo_perda_descricao?: string | null
           motivo_perda_tipo?:
             | Database["public"]["Enums"]["motivo_perda_enum"]
@@ -213,6 +217,8 @@ export type Database = {
           data_prevista_pagamento?: number | null
           email?: string | null
           id?: never
+          indicacao_responsavel_nome?: string | null
+          indicacao_responsavel_telefone?: string | null
           motivo_perda_descricao?: string | null
           motivo_perda_tipo?:
             | Database["public"]["Enums"]["motivo_perda_enum"]
