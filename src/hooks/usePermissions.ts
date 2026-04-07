@@ -8,6 +8,7 @@ export function usePermissions() {
     canAssignConsultor: isAdmin,
     canReassignLead: isAdmin,
     canExportCsv: isAdmin,
+    canImportCsv: isAdmin,
     canManageUsers: isAdmin,
     canViewPerformanceTable: isAdmin,
     canViewFinancialKpis: isAdmin,

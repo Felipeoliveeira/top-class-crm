@@ -17,12 +17,14 @@ import {
   type LeadStatus,
   type LeadOrigem,
 } from '@/types'
-import { Pencil, UserX, Download, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { Pencil, UserX, Download, Upload, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ImportarCsvModal } from '@/components/leads/ImportarCsvModal'
 
 export default function LeadsPage() {
   const { user } = useAuth()
-  const { canViewAllLeads, canExportCsv, canInactivateLead } = usePermissions()
+  const { canViewAllLeads, canExportCsv, canImportCsv, canInactivateLead } = usePermissions()
+  const [importModalOpen, setImportModalOpen] = useState(false)
   const navigate = useNavigate()
 
   const { data: allLeads = [], isLoading: loading } = usePipelineLeads()
@@ -122,15 +124,28 @@ export default function LeadsPage() {
         title="Leads"
         subtitle={`${filteredLeads.length} leads encontrados`}
         actions={
-          canExportCsv ? (
-            <Button
-              onClick={handleExportCsv}
-              variant="outline"
-              className="hidden md:flex border-border text-foreground hover:bg-surface-elevated"
-              disabled={exportLogMutation.isPending}
-            >
-              <Download className="mr-2 h-4 w-4" /> Exportar CSV
-            </Button>
+          (canExportCsv || canImportCsv) ? (
+            <div className="hidden md:flex items-center gap-2">
+              {canImportCsv && (
+                <Button
+                  onClick={() => setImportModalOpen(true)}
+                  variant="outline"
+                  className="border-border text-foreground hover:bg-surface-elevated"
+                >
+                  <Upload className="mr-2 h-4 w-4" /> Importar CSV
+                </Button>
+              )}
+              {canExportCsv && (
+                <Button
+                  onClick={handleExportCsv}
+                  variant="outline"
+                  className="border-border text-foreground hover:bg-surface-elevated"
+                  disabled={exportLogMutation.isPending}
+                >
+                  <Download className="mr-2 h-4 w-4" /> Exportar CSV
+                </Button>
+              )}
+            </div>
           ) : null
         }
       />
@@ -338,6 +353,10 @@ export default function LeadsPage() {
             </Button>
           </div>
         </div>
+      )}
+
+      {canImportCsv && (
+        <ImportarCsvModal open={importModalOpen} onOpenChange={setImportModalOpen} />
       )}
     </div>
   )
