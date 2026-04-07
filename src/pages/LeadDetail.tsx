@@ -599,7 +599,10 @@ export default function LeadDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-foreground">Origem</Label>
-              <Select value={lead.origem || ''} onValueChange={v => updateField('origem', v as LeadOrigem)}>
+              <Select
+                value={lead.origem || ''}
+                onValueChange={v => updateField('origem', v as LeadOrigem)}
+              >
                 <SelectTrigger className="bg-background border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent className="bg-card border-border">
                   {Object.entries(LEAD_ORIGEM_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-foreground focus:bg-surface-elevated">{v}</SelectItem>)}
@@ -615,6 +618,44 @@ export default function LeadDetailPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {lead.origem === 'indicacao' && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Responsável da Indicação</Label>
+                  <Input
+                    value={lead.indicacao_responsavel_nome || ''}
+                    onChange={e => updateField('indicacao_responsavel_nome', e.target.value || null)}
+                    placeholder="Nome completo do indicador"
+                    className="bg-background border-border text-foreground"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Número do Responsável</Label>
+                  <Input
+                    value={lead.indicacao_responsavel_telefone || ''}
+                    onChange={e =>
+                      updateField(
+                        'indicacao_responsavel_telefone',
+                        formatTelefoneBrMobile(e.target.value) || null,
+                      )
+                    }
+                    placeholder="(XX) XXXXX-XXXX"
+                    maxLength={15}
+                    className={cn(
+                      'bg-background border-border text-foreground',
+                      lead.indicacao_responsavel_telefone &&
+                        !isValidTelefoneBrMobile(lead.indicacao_responsavel_telefone) &&
+                        'border-destructive focus-visible:ring-destructive',
+                    )}
+                  />
+                  {lead.indicacao_responsavel_telefone &&
+                    !isValidTelefoneBrMobile(lead.indicacao_responsavel_telefone) && (
+                      <p className="text-xs text-destructive">Celular inválido. Use (DD) 9XXXX-XXXX</p>
+                    )}
+                </div>
+              </>
+            )}
           </div>
         </CollapsibleContent>
       </Collapsible>

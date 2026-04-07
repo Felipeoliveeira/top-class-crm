@@ -52,6 +52,8 @@ export function leadPersistPayload(lead: Lead) {
     possui_nota_fiscal: lead.possui_nota_fiscal,
     motivo_perda_tipo: lead.motivo_perda_tipo,
     motivo_perda_descricao: lead.motivo_perda_descricao,
+    indicacao_responsavel_nome: lead.indicacao_responsavel_nome,
+    indicacao_responsavel_telefone: lead.indicacao_responsavel_telefone,
   }
 }
 

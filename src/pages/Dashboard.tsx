@@ -23,6 +23,7 @@ const origemColors: Record<string, string> = {
   google: '#3B82F6',
   placa: '#D97706',
   rede_social: '#16A34A',
+  outros: '#64748B',
 }
 
 export default function DashboardPage() {
