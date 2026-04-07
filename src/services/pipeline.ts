@@ -141,7 +141,7 @@ export async function validateNegociacaoToFechado(lead: Lead): Promise<string[]>
   }
 
   if (lead.possui_nota_fiscal !== true && lead.possui_nota_fiscal !== false) {
-    missing.push('Possui Nota Fiscal?')
+    missing.push('Emite Nota Fiscal?')
   }
 
   return missing
