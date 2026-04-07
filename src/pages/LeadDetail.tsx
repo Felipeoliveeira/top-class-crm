@@ -399,7 +399,7 @@ export default function LeadDetailPage() {
         missing.push('Data fim do contrato deve ser igual ou posterior à data de início')
       }
       if (lead.possui_nota_fiscal !== true && lead.possui_nota_fiscal !== false) {
-        missing.push('Possui Nota Fiscal?')
+        missing.push('Emite Nota Fiscal?')
       }
     }
 
@@ -861,7 +861,7 @@ export default function LeadDetailPage() {
               </div>
             </div>
             <div className="space-y-3">
-              <Label className="text-foreground">Possui Nota Fiscal?</Label>
+              <Label className="text-foreground">Emite Nota Fiscal?</Label>
               <RadioGroup
                 value={
                   lead.possui_nota_fiscal === true ? 'sim' : lead.possui_nota_fiscal === false ? 'nao' : ''

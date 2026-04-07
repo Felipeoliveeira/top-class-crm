@@ -108,6 +108,8 @@ const IMPORT_CSV_HEADERS = [
   'cnpj',
   'razao_social',
   'origem',
+  'indicacao_responsavel_nome',
+  'indicacao_responsavel_telefone',
   'necessidade',
   'servico_interesse',
   'valor_bruto',
@@ -117,7 +119,7 @@ const IMPORT_CSV_HEADERS = [
   'possui_nota_fiscal',
 ] as const
 
-const VALID_ORIGENS: LeadOrigem[] = ['indicacao', 'google', 'placa', 'rede_social']
+const VALID_ORIGENS: LeadOrigem[] = ['indicacao', 'google', 'placa', 'rede_social', 'outros']
 const VALID_NECESSIDADES: LeadNecessidade[] = ['escritorio_virtual', 'salas', 'endereco_fiscal', 'coworking']
 const VALID_SERVICOS: ServicoInteresse[] = [
   'plano_pro', 'plano_premium', 'plano_top', 'coworking',
@@ -141,6 +143,10 @@ export interface ImportLeadPayload {
   cnpj: string | null
   razao_social: string | null
   origem: LeadOrigem
+  /** Preenchido apenas quando origem = 'indicacao' */
+  indicacao_responsavel_nome: string | null
+  /** Preenchido apenas quando origem = 'indicacao', formato (XX) XXXXX-XXXX */
+  indicacao_responsavel_telefone: string | null
   necessidade: LeadNecessidade
   servico_interesse: ServicoInteresse
   valor_bruto: number
@@ -194,20 +200,22 @@ function isValidIsoDate(date: string): boolean {
 /** Gera o CSV template para download, com cabeçalhos e 1 linha de exemplo. */
 export function buildCsvTemplate(): string {
   const example = [
-    'João da Silva',
-    '(79) 99999-9999',
-    'joao@email.com',
-    '123.456.789-09',
-    '',
-    '',
-    'indicacao',
-    'escritorio_virtual',
-    'plano_pro',
-    '850',
-    '10',
-    '2026-05-01',
-    '2027-04-30',
-    'sim',
+    'João da Silva',       // nome
+    '(79) 99999-9999',    // telefone
+    'joao@email.com',     // email
+    '123.456.789-09',     // cpf
+    '',                    // cnpj
+    '',                    // razao_social
+    'indicacao',           // origem
+    'Maria Souza',         // indicacao_responsavel_nome (só quando origem=indicacao)
+    '(79) 98888-7777',    // indicacao_responsavel_telefone (só quando origem=indicacao)
+    'escritorio_virtual',  // necessidade
+    'plano_pro',           // servico_interesse
+    '850',                 // valor_bruto
+    '10',                  // vencimento_dia
+    '2026-05-01',          // data_inicio_contrato
+    '2027-04-30',          // data_fim_contrato
+    'sim',                 // possui_nota_fiscal
   ]
   return BOM + [IMPORT_CSV_HEADERS.join(';'), example.join(';')].join('\r\n')
 }
@@ -247,6 +255,8 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
     const cnpj = row['cnpj'] ?? ''
     const razao_social = row['razao_social'] ?? ''
     const origem = row['origem'] ?? ''
+    const indicacao_responsavel_nome = row['indicacao_responsavel_nome'] ?? ''
+    const indicacao_responsavel_telefone = row['indicacao_responsavel_telefone'] ?? ''
     const necessidade = row['necessidade'] ?? ''
     const servico_interesse = row['servico_interesse'] ?? ''
     const valor_bruto_str = row['valor_bruto'] ?? ''
@@ -266,6 +276,9 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
     if (cnpj && !razao_social) errors.push('Razão Social é obrigatória quando CNPJ está preenchido')
     if (!origem) errors.push('Origem é obrigatória')
     else if (!VALID_ORIGENS.includes(origem as LeadOrigem)) errors.push(`Origem inválida: "${origem}". Use: ${VALID_ORIGENS.join(', ')}`)
+    if (indicacao_responsavel_telefone && !isValidTelefone(indicacao_responsavel_telefone)) {
+      errors.push('Número do responsável da indicação inválido (formato: (DD) 9XXXX-XXXX)')
+    }
     if (!necessidade) errors.push('Necessidade é obrigatória')
     else if (!VALID_NECESSIDADES.includes(necessidade as LeadNecessidade)) errors.push(`Necessidade inválida: "${necessidade}". Use: ${VALID_NECESSIDADES.join(', ')}`)
     if (!servico_interesse) errors.push('Serviço de interesse é obrigatório')
@@ -306,6 +319,8 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
           cnpj: cnpj || null,
           razao_social: razao_social || null,
           origem: origem as LeadOrigem,
+          indicacao_responsavel_nome: indicacao_responsavel_nome || null,
+          indicacao_responsavel_telefone: indicacao_responsavel_telefone || null,
           necessidade: necessidade as LeadNecessidade,
           servico_interesse: servico_interesse as ServicoInteresse,
           valor_bruto,

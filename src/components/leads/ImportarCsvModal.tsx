@@ -35,6 +35,7 @@ const ORIGEM_LABELS: Record<string, string> = {
   google: 'Google',
   placa: 'Placa',
   rede_social: 'Rede Social',
+  outros: 'Outros',
 }
 
 const SERVICO_LABELS: Record<string, string> = {
@@ -187,10 +188,15 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
                 </div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-3">Campos opcionais</p>
                 <div className="flex flex-wrap gap-1">
-                  {['cnpj', 'razao_social'].map(f => (
+                  {['cnpj', 'razao_social', 'indicacao_responsavel_nome', 'indicacao_responsavel_telefone'].map(f => (
                     <Badge key={f} variant="outline" className="text-xs font-mono">{f}</Badge>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <span className="font-mono text-primary">indicacao_responsavel_nome</span> e{' '}
+                  <span className="font-mono text-primary">indicacao_responsavel_telefone</span>{' '}
+                  só são usados quando <span className="font-mono">origem = indicacao</span>.
+                </p>
                 <p className="text-xs text-muted-foreground mt-2">
                   Campos fixos (não entram no CSV): <span className="font-mono">status = negociação</span>,{' '}
                   <span className="font-mono">status_financeiro = pago</span>,{' '}
