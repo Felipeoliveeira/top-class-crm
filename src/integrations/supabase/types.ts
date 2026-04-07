@@ -356,7 +356,7 @@ export type Database = {
         | "salas"
         | "endereco_fiscal"
         | "coworking"
-      origem_enum: "indicacao" | "google" | "placa" | "rede_social"
+      origem_enum: "indicacao" | "google" | "placa" | "rede_social" | "outros"
       role_enum: "admin" | "consultor"
       servico_enum:
         | "plano_pro"
@@ -517,7 +517,7 @@ export const Constants = {
         "endereco_fiscal",
         "coworking",
       ],
-      origem_enum: ["indicacao", "google", "placa", "rede_social"],
+      origem_enum: ["indicacao", "google", "placa", "rede_social", "outros"],
       role_enum: ["admin", "consultor"],
       servico_enum: [
         "plano_pro",

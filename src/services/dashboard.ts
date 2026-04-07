@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client'
-import { LEAD_ORIGEM_LABELS, SERVICO_LABELS } from '@/types'
-import type { Lead, LeadOrigem, Perfil } from '@/types'
+import { LEAD_ORIGEM_LABELS, LEAD_ORIGEM_ORDER, SERVICO_LABELS } from '@/types'
+import type { Lead, Perfil } from '@/types'
 
 export type TimeFilter = 'hoje' | '7dias' | '30dias' | 'total'
 
@@ -104,7 +104,7 @@ export interface OrigemBarPoint {
 }
 
 export function computeLeadsPorOrigem(leads: Lead[]): OrigemBarPoint[] {
-  return (['indicacao', 'google', 'placa', 'rede_social'] as LeadOrigem[]).map(o => ({
+  return LEAD_ORIGEM_ORDER.map(o => ({
     name: LEAD_ORIGEM_LABELS[o],
     value: leads.filter(l => l.origem === o).length,
     key: o,
@@ -113,7 +113,7 @@ export function computeLeadsPorOrigem(leads: Lead[]): OrigemBarPoint[] {
 
 export function computeClientesPorOrigem(leads: Lead[]): OrigemBarPoint[] {
   const fechados = leads.filter(l => l.status === 'fechado')
-  return (['indicacao', 'google', 'placa', 'rede_social'] as LeadOrigem[]).map(o => ({
+  return LEAD_ORIGEM_ORDER.map(o => ({
     name: LEAD_ORIGEM_LABELS[o],
     value: fechados.filter(l => l.origem === o).length,
     key: o,
