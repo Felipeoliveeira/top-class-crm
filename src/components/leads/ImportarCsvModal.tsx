@@ -142,16 +142,16 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Importar Leads via CSV</DialogTitle>
           <DialogDescription>
-            Importe leads em massa diretamente para o estágio de Negociação.
+            Importe leads em massa com o estágio definido diretamente no CSV.
             Os documentos deverão ser adicionados individualmente em cada lead.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as Step)} className="flex-1 flex flex-col min-h-0">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as Step)} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <TabsList className="grid grid-cols-4 w-full shrink-0">
             <TabsTrigger value="template">1. Template</TabsTrigger>
             <TabsTrigger value="upload">2. Upload</TabsTrigger>
@@ -167,8 +167,8 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
           </TabsList>
 
           {/* ABA 1: Template */}
-          <TabsContent value="template" className="flex-1">
-            <div className="flex flex-col items-center justify-center h-full gap-6 py-8">
+          <TabsContent value="template" className="flex-1 min-h-0 overflow-y-auto">
+            <div className="flex flex-col items-center justify-center min-h-full gap-6 py-8 px-2">
               <div className="text-center space-y-2">
                 <FileText className="h-12 w-12 text-muted-foreground mx-auto" />
                 <h3 className="text-lg font-semibold">Baixe o template CSV</h3>
@@ -180,31 +180,42 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
               </div>
 
               <div className="bg-surface-elevated rounded-lg p-4 w-full max-w-lg space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Campos obrigatórios</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Obrigatórios para todos os status</p>
                 <div className="flex flex-wrap gap-1">
-                  {['nome', 'telefone', 'email', 'cpf', 'origem', 'necessidade', 'servico_interesse', 'valor_bruto', 'vencimento_dia', 'data_inicio_contrato', 'data_fim_contrato', 'possui_nota_fiscal'].map(f => (
+                  {['status', 'nome', 'telefone', 'origem', 'necessidade'].map(f => (
                     <Badge key={f} variant="secondary" className="text-xs font-mono">{f}</Badge>
                   ))}
                 </div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-3">Campos opcionais</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-3">Obrigatórios em negociacao e fechado</p>
+                <div className="flex flex-wrap gap-1">
+                  {['email', 'servico_interesse', 'valor_bruto', 'vencimento_dia', 'data_inicio_contrato', 'data_fim_contrato'].map(f => (
+                    <Badge key={f} variant="secondary" className="text-xs font-mono">{f}</Badge>
+                  ))}
+                </div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-3">Obrigatório apenas em negociacao</p>
+                <div className="flex flex-wrap gap-1">
+                  {['cpf', 'possui_nota_fiscal'].map(f => (
+                    <Badge key={f} variant="secondary" className="text-xs font-mono">{f}</Badge>
+                  ))}
+                </div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-3">Obrigatório apenas em perdido</p>
+                <div className="flex flex-wrap gap-1">
+                  <Badge variant="secondary" className="text-xs font-mono">motivo_perda</Badge>
+                </div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-3">Sempre opcionais</p>
                 <div className="flex flex-wrap gap-1">
                   {['cnpj', 'razao_social', 'indicacao_responsavel_nome', 'indicacao_responsavel_telefone'].map(f => (
                     <Badge key={f} variant="outline" className="text-xs font-mono">{f}</Badge>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  <span className="font-mono text-primary">indicacao_responsavel_nome</span> e{' '}
-                  <span className="font-mono text-primary">indicacao_responsavel_telefone</span>{' '}
-                  só são usados quando <span className="font-mono">origem = indicacao</span>.
-                </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Campos fixos (não entram no CSV): <span className="font-mono">status = negociação</span>,{' '}
-                  <span className="font-mono">status_financeiro = pago</span>,{' '}
-                  <span className="font-mono">consultor = você</span>
+                  Valores aceitos em <span className="font-mono text-primary">status</span>:{' '}
+                  <span className="font-mono">atendimento</span>, <span className="font-mono">negociacao</span>,{' '}
+                  <span className="font-mono">fechado</span>, <span className="font-mono">perdido</span>
                 </p>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap justify-center">
                 <Button onClick={handleDownloadTemplate} variant="outline">
                   <Download className="mr-2 h-4 w-4" />
                   Baixar template.csv
@@ -217,8 +228,8 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
           </TabsContent>
 
           {/* ABA 2: Upload */}
-          <TabsContent value="upload" className="flex-1">
-            <div className="flex flex-col items-center justify-center h-full gap-6 py-8">
+          <TabsContent value="upload" className="flex-1 min-h-0 overflow-y-auto">
+            <div className="flex flex-col items-center justify-center min-h-full gap-6 py-8 px-2">
               <div
                 className={`border-2 border-dashed rounded-xl p-12 w-full max-w-lg text-center cursor-pointer transition-colors ${
                   isDragging
@@ -309,7 +320,11 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
                         </span>
                         {row.success && row.data && (
                           <span className="text-muted-foreground text-xs shrink-0">
-                            {row.data.telefone} · {ORIGEM_LABELS[row.data.origem] ?? row.data.origem} · {SERVICO_LABELS[row.data.servico_interesse] ?? row.data.servico_interesse} · R$ {row.data.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {row.data.telefone}
+                            {' · '}
+                            <span className="capitalize">{row.data.status}</span>
+                            {row.data.servico_interesse && ` · ${SERVICO_LABELS[row.data.servico_interesse] ?? row.data.servico_interesse}`}
+                            {row.data.valor_bruto != null && ` · R$ ${row.data.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                           </span>
                         )}
                       </div>
@@ -347,9 +362,9 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
           </TabsContent>
 
           {/* ABA 4: Resultado */}
-          <TabsContent value="resultado" className="flex-1">
+          <TabsContent value="resultado" className="flex-1 min-h-0 overflow-y-auto">
             {importResult && (
-              <div className="flex flex-col items-center justify-center h-full gap-6 py-8">
+              <div className="flex flex-col items-center justify-center min-h-full gap-6 py-8 px-2">
                 <div className="text-center space-y-2">
                   {importResult.totalSucesso > 0 ? (
                     <CheckCircle2 className="h-14 w-14 text-green-500 mx-auto" />
@@ -387,12 +402,12 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
 
                 {importResult.totalSucesso > 0 && (
                   <p className="text-sm text-muted-foreground text-center max-w-sm">
-                    Os leads foram criados no estágio <strong>Negociação</strong>.
-                    Acesse cada lead para adicionar documentos antes de avançar para Fechado.
+                    Os leads foram criados no estágio definido no CSV.
+                    Acesse cada lead para completar informações e adicionar documentos.
                   </p>
                 )}
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap justify-center">
                   <Button variant="outline" onClick={handleReset}>
                     Nova importação
                   </Button>

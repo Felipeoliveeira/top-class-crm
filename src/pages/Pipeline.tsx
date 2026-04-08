@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge } from '@/components/StatusBadge'
 import { PaymentPendingFlag } from '@/components/PaymentPendingFlag'
+import { ImportedIncompleteFlag } from '@/components/ImportedIncompleteFlag'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -50,6 +51,19 @@ import {
 import { useSortable } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Retorna true quando um lead importado via CSV está em Fechado com dados obrigatórios ausentes. */
+function hasImportedIncompleteData(lead: Lead): boolean {
+  return (
+    lead.importado_csv &&
+    lead.status === 'fechado' &&
+    (!lead.cpf || !lead.rg || lead.possui_nota_fiscal === null)
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Constantes visuais
@@ -120,6 +134,9 @@ function DraggableLeadCard({ lead, color, getConsultorName, onClick }: {
       <p className="text-xs text-muted-foreground">{new Date(lead.created_at).toLocaleDateString('pt-BR')}</p>
       {lead.status === 'negociacao' && lead.status_financeiro === 'pendente' && (
         <div className="mt-2"><PaymentPendingFlag /></div>
+      )}
+      {hasImportedIncompleteData(lead) && (
+        <div className="mt-2"><ImportedIncompleteFlag /></div>
       )}
       {lead.status === 'inativo' && (
         <StatusBadge status="inativo" className="mt-2" />
@@ -416,6 +433,7 @@ export default function PipelinePage() {
               {lead.valor_liquido && <p className="text-sm font-bold text-primary">R$ {lead.valor_liquido.toLocaleString('pt-BR')}</p>}
               <p className="text-xs text-muted-foreground">{getConsultorName(lead.consultor_id)} • {new Date(lead.created_at).toLocaleDateString('pt-BR')}</p>
               {lead.status_financeiro === 'pendente' && <PaymentPendingFlag />}
+              {hasImportedIncompleteData(lead) && <ImportedIncompleteFlag />}
               <div className="flex gap-2 pt-2">
                 <Button size="sm" variant="outline" className="flex-1 border-border text-foreground" onClick={() => navigate(`/leads/${lead.id}`)}>
                   Ver Detalhes

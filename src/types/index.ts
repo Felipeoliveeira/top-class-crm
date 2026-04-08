@@ -49,6 +49,8 @@ export interface Lead {
   indicacao_responsavel_nome: string | null
   /** Preenchido apenas quando origem = 'indicacao', formato (XX) XXXXX-XXXX */
   indicacao_responsavel_telefone: string | null
+  /** true quando o lead foi inserido via importação CSV */
+  importado_csv: boolean
   created_at: string
   updated_at: string
   ultima_movimentacao_at: string | null
