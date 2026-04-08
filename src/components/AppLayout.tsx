@@ -3,12 +3,13 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { AppSidebar } from './AppSidebar'
 import { AppHeader } from './AppHeader'
 import { useAuth } from '@/hooks/useAuth'
+import { useInactivityTimeout } from '@/hooks/useInactivityTimeout'
 import { Loader2 } from 'lucide-react'
 
 const STATUS_CHECK_INTERVAL_MS = 30_000
 
 export function AppLayout() {
-  const { isAuthenticated, initialize, initialized, checkActiveStatus } = useAuth()
+  const { isAuthenticated, initialize, initialized, checkActiveStatus, logout } = useAuth()
 
   useEffect(() => {
     initialize()
@@ -19,6 +20,9 @@ export function AppLayout() {
     const interval = setInterval(checkActiveStatus, STATUS_CHECK_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [isAuthenticated, checkActiveStatus])
+
+  // Logout automático após 40 min de inatividade
+  useInactivityTimeout(logout, isAuthenticated)
 
   if (!initialized) {
     return (
