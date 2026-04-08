@@ -65,7 +65,12 @@ export function computeDashboardKpis(leads: Lead[]): DashboardKpis {
   const valorPerdido = perdidos
     .filter(l => l.valor_bruto != null)
     .reduce((sum, l) => sum + (l.valor_bruto ?? 0), 0)
-  const totalDescontos = fechados.reduce((sum, l) => sum + ((l.valor_bruto ?? 0) - (l.valor_liquido ?? 0)), 0)
+  // Só computa desconto quando ambos os valores estão preenchidos.
+  // Se valor_liquido é null (ex: lead importado sem desconto explícito), contribuição = 0.
+  const totalDescontos = fechados.reduce((sum, l) => {
+    if (l.valor_bruto == null || l.valor_liquido == null) return sum
+    return sum + (l.valor_bruto - l.valor_liquido)
+  }, 0)
 
   return {
     totalLeads,
