@@ -51,12 +51,21 @@ export default function LeadsPage() {
 
     if (search.trim()) {
       const query = search.toLowerCase().trim()
-      data = data.filter(
-        lead =>
-          lead.nome.toLowerCase().includes(query) ||
-          lead.telefone.replace(/\D/g, '').includes(query.replace(/\D/g, '')) ||
-          (lead.email || '').toLowerCase().includes(query),
-      )
+      const queryDigits = query.replace(/\D/g, '')
+
+      data = data.filter(lead => {
+        if (lead.nome.toLowerCase().includes(query)) return true
+        if ((lead.email ?? '').toLowerCase().includes(query)) return true
+        if ((lead.razao_social ?? '').toLowerCase().includes(query)) return true
+
+        if (queryDigits) {
+          if (lead.telefone.replace(/\D/g, '').includes(queryDigits)) return true
+          if ((lead.cnpj ?? '').replace(/\D/g, '').includes(queryDigits)) return true
+          if ((lead.cpf ?? '').replace(/\D/g, '').includes(queryDigits)) return true
+        }
+
+        return false
+      })
     }
 
     if (statusFilter !== 'all') data = data.filter(lead => lead.status === statusFilter)
@@ -154,7 +163,7 @@ export default function LeadsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nome, e-mail ou telefone..."
+            placeholder="Buscar por nome, e-mail, telefone, razão social, CNPJ ou CPF..."
             value={search}
             onChange={event => {
               setSearch(event.target.value)
@@ -265,7 +274,7 @@ export default function LeadsPage() {
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    {lead.status === 'fechado' && canInactivateLead(lead.consultor_id) && (
+                    {lead.status === 'fechado' && canInactivateLead() && (
                       <Button
                         variant="ghost"
                         size="icon"

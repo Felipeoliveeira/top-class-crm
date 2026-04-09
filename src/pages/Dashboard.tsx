@@ -62,7 +62,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Dashboard" subtitle={canViewAllDashboard ? 'Visão geral do time comercial' : 'Meus resultados'} />
+      <PageHeader title="Dashboard" subtitle={canViewPerformanceTable ? 'Visão geral do time comercial' : 'Visão geral do funil'} />
 
       <div className="flex gap-2">
         {(Object.keys(filterLabels) as TimeFilter[]).map(f => (
