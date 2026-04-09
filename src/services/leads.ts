@@ -1,7 +1,24 @@
 import { supabase } from '@/integrations/supabase/client'
 import type { Lead, LeadOrigem, LeadNecessidade, LeadStatus, ServicoInteresse } from '@/types'
-import { MODO_IMPORTACAO_ATIVO } from '@/lib/import-mode'
 import { calculateValorLiquido } from '@/services/pipeline'
+import { isValidCpf, isValidCnpj } from '@/lib/br-inputs'
+import * as XLSX from 'xlsx'
+import {
+  normalizeNome,
+  normalizeTelefone,
+  normalizeCpf,
+  normalizeCnpj,
+  normalizeEmail,
+  normalizeValor,
+  normalizeVencimento,
+  normalizeDate,
+  normalizeNotaFiscal,
+  normalizeStatus,
+  normalizeEnumField,
+  normalizeServicoInteresse,
+  isEmailValid,
+  isValidTelefoneImport,
+} from '@/lib/csv-normalizers'
 
 const BOM = '\uFEFF'
 
@@ -132,10 +149,15 @@ const VALID_SERVICOS: ServicoInteresse[] = [
 
 const MAX_IMPORT_ROWS = 200
 
+export interface ImportRowError {
+  field: string
+  message: string
+}
+
 export interface ImportRowResult {
   rowIndex: number
   success: boolean
-  errors: string[]
+  errors: ImportRowError[]
   data?: ImportLeadPayload
 }
 
@@ -163,46 +185,6 @@ export interface ImportLeadPayload {
   motivo_perda: string | null
 }
 
-function isValidTelefone(tel: string): boolean {
-  const digits = tel.replace(/\D/g, '')
-  return /^[1-9]{2}9\d{8}$/.test(digits)
-}
-
-function isValidCpfDigits(cpf: string): boolean {
-  const digits = cpf.replace(/\D/g, '')
-  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false
-  const calc = (mod: number) => {
-    let sum = 0
-    for (let i = 0; i < mod - 1; i++) sum += parseInt(digits[i]) * (mod - i)
-    const rest = (sum * 10) % 11
-    return rest === 10 || rest === 11 ? 0 : rest
-  }
-  return calc(10) === parseInt(digits[9]) && calc(11) === parseInt(digits[10])
-}
-
-function isValidCnpjDigits(cnpj: string): boolean {
-  const digits = cnpj.replace(/\D/g, '')
-  if (digits.length !== 14 || /^(\d)\1{13}$/.test(digits)) return false
-  const calc = (len: number) => {
-    let sum = 0
-    let pos = len - 7
-    for (let i = len; i >= 1; i--) {
-      sum += parseInt(digits[len - i]) * pos--
-      if (pos < 2) pos = 9
-    }
-    const rest = sum % 11
-    return rest < 2 ? 0 : 11 - rest
-  }
-  return calc(12) === parseInt(digits[12]) && calc(13) === parseInt(digits[13])
-}
-
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-}
-
-function isValidIsoDate(date: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) && !isNaN(Date.parse(date))
-}
 
 /** Gera o CSV template para download, com cabeçalhos e 1 linha de exemplo. */
 export function buildCsvTemplate(): string {
@@ -277,6 +259,73 @@ export function buildCsvTemplate(): string {
   ].join('\r\n')
 }
 
+/** Gera template Excel (.xlsx) com aba de dados e aba de instruções. */
+export function buildExcelTemplate(): Blob {
+  const wb = XLSX.utils.book_new()
+
+  // ── Aba "Template" com cabeçalhos e exemplos ──
+  const templateData = [
+    [...IMPORT_CSV_HEADERS],
+    [
+      'negociacao', 'João da Silva', '(79) 99999-9999', 'joao@email.com',
+      '123.456.789-09', '', '', 'indicacao', 'Maria Souza', '(79) 98888-7777',
+      'escritorio_virtual', 'plano_pro', '850', '10', '2026-05-01', '2027-04-30', 'sim', '',
+    ],
+    [
+      'fechado', 'Ana Costa', '(79) 98765-4321', 'ana@email.com',
+      '', '', '', 'google', '', '',
+      'escritorio_virtual', 'plano_premium', '1200', '5', '2025-01-01', '2025-12-31', '', '',
+    ],
+    [
+      'perdido', 'Carlos Lima', '(79) 91234-5678', 'carlos@email.com',
+      '', '', '', 'rede_social', '', '',
+      'salas', '', '', '', '', '', '', 'preco_alto',
+    ],
+  ]
+  const wsTemplate = XLSX.utils.aoa_to_sheet(templateData)
+  const colWidths = IMPORT_CSV_HEADERS.map(h => ({ wch: Math.max(h.length + 4, 18) }))
+  wsTemplate['!cols'] = colWidths
+  XLSX.utils.book_append_sheet(wb, wsTemplate, 'Template')
+
+  // ── Aba "Instruções" com descrição de cada campo ──
+  const instrucoes = [
+    ['Campo', 'Descrição', 'Obrigatório em', 'Valores aceitos / Formato'],
+    ['status', 'Estágio do lead no pipeline', 'Todos', 'atendimento, negociacao, fechado, perdido'],
+    ['nome', 'Nome completo do lead', 'Todos', 'Texto livre'],
+    ['telefone', 'Telefone fixo ou celular', 'Todos', '(DD) 9XXXX-XXXX ou apenas dígitos (10-11)'],
+    ['email', 'E-mail do lead', 'negociacao, fechado', 'exemplo@dominio.com'],
+    ['cpf', 'CPF (11 dígitos)', 'negociacao', '123.456.789-09 ou apenas dígitos'],
+    ['cnpj', 'CNPJ (14 dígitos)', 'Opcional (requer razao_social)', '12.345.678/0001-00 ou apenas dígitos'],
+    ['razao_social', 'Razão social (PJ)', 'Quando CNPJ preenchido', 'Texto livre'],
+    ['origem', 'Canal de origem do lead', 'Todos', 'indicacao, google, placa, rede_social, outros'],
+    ['indicacao_responsavel_nome', 'Nome de quem indicou', 'Opcional (origem=indicacao)', 'Texto livre'],
+    ['indicacao_responsavel_telefone', 'Telefone de quem indicou', 'Opcional (origem=indicacao)', '(DD) 9XXXX-XXXX'],
+    ['necessidade', 'Necessidade do lead', 'Todos', 'escritorio_virtual, salas, endereco_fiscal, coworking'],
+    ['servico_interesse', 'Serviço contratado / de interesse', 'negociacao, fechado', 'plano_pro, plano_premium, plano_top, coworking, sala_special_room, mini_sala_reuniao, sala_reuniao_8, sala_reuniao_12, salas_fixas'],
+    ['valor_bruto', 'Valor mensal (R$)', 'negociacao, fechado', 'Número: 850 ou 1.200,50 ou R$ 850'],
+    ['vencimento_dia', 'Dia de vencimento (1–31)', 'negociacao, fechado', 'Número: 1 a 31'],
+    ['data_inicio_contrato', 'Início do contrato', 'negociacao, fechado', 'DD/MM/YYYY, DD-MM-YYYY ou YYYY-MM-DD'],
+    ['data_fim_contrato', 'Fim do contrato', 'negociacao, fechado', 'DD/MM/YYYY, DD-MM-YYYY ou YYYY-MM-DD'],
+    ['possui_nota_fiscal', 'Emite nota fiscal?', 'negociacao', 'sim/s/1/true/yes ou nao/n/0/false/no'],
+    ['motivo_perda', 'Motivo da perda', 'perdido', 'Texto livre'],
+  ]
+  const wsInstrucoes = XLSX.utils.aoa_to_sheet(instrucoes)
+  wsInstrucoes['!cols'] = [{ wch: 32 }, { wch: 36 }, { wch: 28 }, { wch: 60 }]
+  XLSX.utils.book_append_sheet(wb, wsInstrucoes, 'Instruções')
+
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+  return new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+}
+
+/** Converte a primeira sheet de um arquivo .xlsx em texto CSV (separador ;). */
+export function xlsxToCsvText(arrayBuffer: ArrayBuffer): string {
+  const wb = XLSX.read(arrayBuffer, { type: 'array' })
+  const firstSheetName = wb.SheetNames[0]
+  if (!firstSheetName) return ''
+  const ws = wb.Sheets[firstSheetName]
+  return XLSX.utils.sheet_to_csv(ws, { FS: ';' })
+}
+
 const VALID_IMPORT_STATUSES = ['atendimento', 'negociacao', 'fechado', 'perdido'] as const
 type ImportStatus = typeof VALID_IMPORT_STATUSES[number]
 
@@ -303,7 +352,7 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
     return [{
       rowIndex: 0,
       success: false,
-      errors: [`O arquivo contém ${dataLines.length} linhas. O máximo permitido é ${MAX_IMPORT_ROWS}.`],
+      errors: [{ field: 'arquivo', message: `O arquivo contém ${dataLines.length} linhas. O máximo permitido é ${MAX_IMPORT_ROWS}.` }],
     }]
   }
 
@@ -315,103 +364,151 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
       row[header[j]] = cells[j] ?? ''
     }
 
-    const errors: string[] = []
+    const errors: ImportRowError[] = []
 
-    // Leitura de campos
-    const status_raw = (row['status'] ?? '').toLowerCase().trim()
-    const nome = row['nome'] ?? ''
-    const telefone = row['telefone'] ?? ''
-    const email = row['email'] ?? ''
-    const cpf = row['cpf'] ?? ''
-    const cnpj = row['cnpj'] ?? ''
-    const razao_social = row['razao_social'] ?? ''
-    const origem = row['origem'] ?? ''
-    const indicacao_responsavel_nome = row['indicacao_responsavel_nome'] ?? ''
-    const indicacao_responsavel_telefone = row['indicacao_responsavel_telefone'] ?? ''
-    const necessidade = row['necessidade'] ?? ''
-    const servico_interesse = row['servico_interesse'] ?? ''
-    const valor_bruto_str = row['valor_bruto'] ?? ''
-    const vencimento_str = row['vencimento_dia'] ?? ''
-    const data_inicio = row['data_inicio_contrato'] ?? ''
-    const data_fim = row['data_fim_contrato'] ?? ''
-    const nota_fiscal_str = (row['possui_nota_fiscal'] ?? '').toLowerCase().trim()
-    const motivo_perda = row['motivo_perda'] ?? ''
+    // ── Normalização de todos os campos antes da validação ──
+    const nome = normalizeNome(row['nome'] ?? '')
+    const telefone = normalizeTelefone(row['telefone'] ?? '')
+    const email = normalizeEmail(row['email'] ?? '')
+    const cpf = normalizeCpf(row['cpf'] ?? '')
+    const cnpj = normalizeCnpj(row['cnpj'] ?? '')
+    const razao_social = (row['razao_social'] ?? '').trim()
+    const origem = normalizeEnumField(row['origem'] ?? '')
+    const indicacao_responsavel_nome = (row['indicacao_responsavel_nome'] ?? '').trim()
+    const indicacao_responsavel_telefone_raw = row['indicacao_responsavel_telefone'] ?? ''
+    const indicacao_responsavel_telefone = normalizeTelefone(indicacao_responsavel_telefone_raw)
+    const necessidade = normalizeEnumField(row['necessidade'] ?? '')
+    const servico_interesse = normalizeServicoInteresse(row['servico_interesse'] ?? '')
+    const valor_bruto_str = normalizeValor(row['valor_bruto'] ?? '')
+    const vencimento_str = normalizeVencimento(row['vencimento_dia'] ?? '')
+    const data_inicio_raw = (row['data_inicio_contrato'] ?? '').trim()
+    const data_fim_raw = (row['data_fim_contrato'] ?? '').trim()
+    const data_inicio = data_inicio_raw ? normalizeDate(data_inicio_raw) : null
+    const data_fim = data_fim_raw ? normalizeDate(data_fim_raw) : null
+    const nota_fiscal = normalizeNotaFiscal(row['possui_nota_fiscal'] ?? '')
+    const motivo_perda = (row['motivo_perda'] ?? '').trim()
+    const status_raw = normalizeStatus(row['status'] ?? '')
 
-    // --- Validação de status ---
+    // ── Validação de status ──
     if (!status_raw) {
-      errors.push(`Status é obrigatório. Use: ${VALID_IMPORT_STATUSES.join(', ')}`)
+      errors.push({ field: 'status', message: `Status é obrigatório. Use: ${VALID_IMPORT_STATUSES.join(', ')}` })
     } else if (!VALID_IMPORT_STATUSES.includes(status_raw as ImportStatus)) {
-      errors.push(`Status inválido: "${status_raw}". Use: ${VALID_IMPORT_STATUSES.join(', ')}`)
+      errors.push({ field: 'status', message: `Status inválido: "${status_raw}". Use: ${VALID_IMPORT_STATUSES.join(', ')}` })
     }
     const status = status_raw as ImportStatus
 
-    // --- Campos obrigatórios para todos os status ---
-    if (!nome) errors.push('Nome é obrigatório')
-    if (!telefone) errors.push('Telefone é obrigatório')
-    else if (!isValidTelefone(telefone)) errors.push('Telefone inválido (formato: (DD) 9XXXX-XXXX)')
-    if (!origem) errors.push('Origem é obrigatória')
-    else if (!VALID_ORIGENS.includes(origem as LeadOrigem)) {
-      errors.push(`Origem inválida: "${origem}". Use: ${VALID_ORIGENS.join(', ')}`)
-    }
-    if (!necessidade) errors.push('Necessidade é obrigatória')
-    else if (!VALID_NECESSIDADES.includes(necessidade as LeadNecessidade)) {
-      errors.push(`Necessidade inválida: "${necessidade}". Use: ${VALID_NECESSIDADES.join(', ')}`)
-    }
-    if (indicacao_responsavel_telefone && !isValidTelefone(indicacao_responsavel_telefone)) {
-      errors.push('Número do responsável da indicação inválido (formato: (DD) 9XXXX-XXXX)')
+    // ── Campos obrigatórios para todos os status ──
+    if (!nome) {
+      errors.push({ field: 'nome', message: 'Nome é obrigatório' })
     }
 
-    // --- Validação de CPF/CNPJ (formato, quando preenchidos) ---
-    if (cpf && !isValidCpfDigits(cpf)) errors.push('CPF inválido')
-    if (cnpj && !isValidCnpjDigits(cnpj)) errors.push('CNPJ inválido')
-    if (cnpj && !razao_social) errors.push('Razão Social é obrigatória quando CNPJ está preenchido')
+    if (!telefone) {
+      errors.push({ field: 'telefone', message: 'Telefone é obrigatório' })
+    } else if (!isValidTelefoneImport(telefone)) {
+      errors.push({ field: 'telefone', message: `Telefone inválido (${telefone.length} dígitos). Esperado: 10 (fixo) ou 11 (celular)` })
+    }
 
-    // --- Campos obrigatórios para negociacao e fechado ---
+    if (!origem) {
+      errors.push({ field: 'origem', message: 'Origem é obrigatória' })
+    } else if (!VALID_ORIGENS.includes(origem as LeadOrigem)) {
+      errors.push({ field: 'origem', message: `Origem inválida: "${origem}". Use: ${VALID_ORIGENS.join(', ')}` })
+    }
+
+    if (!necessidade) {
+      errors.push({ field: 'necessidade', message: 'Necessidade é obrigatória' })
+    } else if (!VALID_NECESSIDADES.includes(necessidade as LeadNecessidade)) {
+      errors.push({ field: 'necessidade', message: `Necessidade inválida: "${necessidade}". Use: ${VALID_NECESSIDADES.join(', ')}` })
+    }
+
+    if (indicacao_responsavel_telefone && !isValidTelefoneImport(indicacao_responsavel_telefone)) {
+      errors.push({ field: 'indicacao_responsavel_telefone', message: 'Telefone do responsável da indicação inválido (esperado: 10 ou 11 dígitos)' })
+    }
+
+    // ── CPF/CNPJ (quando preenchidos) ──
+    if (cpf && cpf.length !== 11) {
+      errors.push({ field: 'cpf', message: `CPF deve ter 11 dígitos (encontrado: ${cpf.length})` })
+    } else if (cpf && !isValidCpf(cpf)) {
+      errors.push({ field: 'cpf', message: 'CPF inválido (dígitos verificadores incorretos)' })
+    }
+
+    if (cnpj && cnpj.length !== 14) {
+      errors.push({ field: 'cnpj', message: `CNPJ deve ter 14 dígitos (encontrado: ${cnpj.length})` })
+    } else if (cnpj && !isValidCnpj(cnpj)) {
+      errors.push({ field: 'cnpj', message: 'CNPJ inválido (dígitos verificadores incorretos)' })
+    }
+
+    if (cnpj && !razao_social) {
+      errors.push({ field: 'razao_social', message: 'Razão Social é obrigatória quando CNPJ está preenchido' })
+    }
+
+    // ── Campos obrigatórios para negociacao e fechado ──
     const requiresContractFields = status === 'negociacao' || status === 'fechado'
     if (requiresContractFields) {
-      if (!email) errors.push('E-mail é obrigatório')
-      else if (!isValidEmail(email)) errors.push('E-mail inválido')
-
-      if (!servico_interesse) errors.push('Serviço de interesse é obrigatório')
-      else if (!VALID_SERVICOS.includes(servico_interesse as ServicoInteresse)) {
-        errors.push(`Serviço inválido: "${servico_interesse}". Use: ${VALID_SERVICOS.join(', ')}`)
+      if (!email) {
+        errors.push({ field: 'email', message: 'E-mail é obrigatório' })
+      } else if (!isEmailValid(email)) {
+        errors.push({ field: 'email', message: 'E-mail inválido' })
       }
 
-      const valor_bruto_parsed = parseFloat(valor_bruto_str.replace(',', '.'))
-      if (!valor_bruto_str) errors.push('Valor bruto é obrigatório')
-      else if (isNaN(valor_bruto_parsed) || valor_bruto_parsed <= 0) {
-        errors.push('Valor bruto inválido (deve ser número positivo)')
+      if (!servico_interesse) {
+        errors.push({ field: 'servico_interesse', message: 'Serviço de interesse é obrigatório' })
+      } else if (!VALID_SERVICOS.includes(servico_interesse as ServicoInteresse)) {
+        errors.push({ field: 'servico_interesse', message: `Serviço inválido: "${servico_interesse}". Use: ${VALID_SERVICOS.join(', ')}` })
+      }
+
+      const valor_bruto_parsed = parseFloat(valor_bruto_str)
+      if (!valor_bruto_str) {
+        errors.push({ field: 'valor_bruto', message: 'Valor bruto é obrigatório' })
+      } else if (isNaN(valor_bruto_parsed) || valor_bruto_parsed <= 0) {
+        errors.push({ field: 'valor_bruto', message: 'Valor bruto inválido (deve ser número positivo)' })
       }
 
       const vencimento_parsed = parseInt(vencimento_str, 10)
-      if (!vencimento_str) errors.push('Vencimento (dia) é obrigatório')
-      else if (isNaN(vencimento_parsed) || vencimento_parsed < 1 || vencimento_parsed > 31) {
-        errors.push('Vencimento deve ser entre 1 e 31')
+      if (!vencimento_str) {
+        errors.push({ field: 'vencimento_dia', message: 'Vencimento (dia) é obrigatório' })
+      } else if (isNaN(vencimento_parsed) || vencimento_parsed < 1 || vencimento_parsed > 31) {
+        errors.push({ field: 'vencimento_dia', message: 'Vencimento deve ser entre 1 e 31' })
       }
 
-      if (!data_inicio) errors.push('Data de início do contrato é obrigatória')
-      else if (!isValidIsoDate(data_inicio)) errors.push('Data de início inválida (use YYYY-MM-DD)')
-      if (!data_fim) errors.push('Data de fim do contrato é obrigatória')
-      else if (!isValidIsoDate(data_fim)) errors.push('Data de fim inválida (use YYYY-MM-DD)')
-      if (data_inicio && data_fim && isValidIsoDate(data_inicio) && isValidIsoDate(data_fim) && data_fim < data_inicio) {
-        errors.push('Data de fim deve ser igual ou posterior à data de início')
+      if (!data_inicio_raw) {
+        errors.push({ field: 'data_inicio_contrato', message: 'Data de início do contrato é obrigatória' })
+      } else if (data_inicio === null) {
+        errors.push({ field: 'data_inicio_contrato', message: 'Data de início não reconhecida. Use DD/MM/YYYY, DD-MM-YYYY ou YYYY-MM-DD' })
+      }
+
+      if (!data_fim_raw) {
+        errors.push({ field: 'data_fim_contrato', message: 'Data de fim do contrato é obrigatória' })
+      } else if (data_fim === null) {
+        errors.push({ field: 'data_fim_contrato', message: 'Data de fim não reconhecida. Use DD/MM/YYYY, DD-MM-YYYY ou YYYY-MM-DD' })
+      }
+
+      if (data_inicio && data_fim && data_fim < data_inicio) {
+        errors.push({ field: 'data_fim_contrato', message: 'Data de fim deve ser igual ou posterior à data de início' })
       }
     }
 
-    // --- CPF e nota fiscal: obrigatórios apenas em negociacao ---
+    // ── CPF e nota fiscal: obrigatórios apenas em negociacao ──
     if (status === 'negociacao') {
-      if (!cpf) errors.push('CPF é obrigatório')
-      if (!nota_fiscal_str) errors.push('Possui nota fiscal é obrigatório (sim ou nao)')
-      else if (nota_fiscal_str !== 'sim' && nota_fiscal_str !== 'nao') {
-        errors.push('Possui nota fiscal deve ser "sim" ou "nao"')
+      if (!cpf) {
+        errors.push({ field: 'cpf', message: 'CPF é obrigatório para status negociação' })
       }
-    } else if (nota_fiscal_str && nota_fiscal_str !== 'sim' && nota_fiscal_str !== 'nao') {
-      errors.push('Possui nota fiscal deve ser "sim" ou "nao"')
+      if (nota_fiscal === null) {
+        errors.push({ field: 'possui_nota_fiscal', message: 'Possui nota fiscal é obrigatório (sim/s/1/true/yes ou nao/n/0/false/no)' })
+      } else if (nota_fiscal === 'invalid') {
+        errors.push({ field: 'possui_nota_fiscal', message: 'Valor não reconhecido. Use: sim/s/1/true/yes ou nao/n/0/false/no' })
+      }
+    } else if (nota_fiscal === 'invalid') {
+      errors.push({ field: 'possui_nota_fiscal', message: 'Valor não reconhecido. Use: sim/s/1/true/yes ou nao/n/0/false/no' })
     }
 
-    // --- motivo_perda: obrigatório apenas em perdido ---
+    // ── E-mail: se preenchido em qualquer status, deve ser válido ──
+    if (email && !requiresContractFields && !isEmailValid(email)) {
+      errors.push({ field: 'email', message: 'E-mail inválido' })
+    }
+
+    // ── motivo_perda: obrigatório apenas em perdido ──
     if (status === 'perdido' && !motivo_perda) {
-      errors.push('Motivo da perda é obrigatório quando status é "perdido"')
+      errors.push({ field: 'motivo_perda', message: 'Motivo da perda é obrigatório quando status é "perdido"' })
     }
 
     if (errors.length > 0) {
@@ -419,14 +516,9 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
       continue
     }
 
-    // Parsear valores numéricos (já validados acima)
-    const requiresContractFieldsClean = status === 'negociacao' || status === 'fechado'
-    const valor_bruto = requiresContractFieldsClean
-      ? parseFloat(valor_bruto_str.replace(',', '.'))
-      : null
-    const vencimento = requiresContractFieldsClean
-      ? parseInt(vencimento_str, 10)
-      : null
+    // Valores numéricos já normalizados e validados
+    const valor_bruto = requiresContractFields ? parseFloat(valor_bruto_str) : null
+    const vencimento = requiresContractFields ? parseInt(vencimento_str, 10) : null
 
     results.push({
       rowIndex,
@@ -449,7 +541,7 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
         data_prevista_pagamento: vencimento,
         data_inicio_contrato: data_inicio || null,
         data_fim_contrato: data_fim || null,
-        possui_nota_fiscal: nota_fiscal_str === 'sim' ? true : nota_fiscal_str === 'nao' ? false : null,
+        possui_nota_fiscal: nota_fiscal === 'true' ? true : nota_fiscal === 'false' ? false : null,
         motivo_perda: motivo_perda || null,
       },
     })
