@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client'
 import type { Lead, LeadOrigem, LeadNecessidade, LeadStatus, ServicoInteresse } from '@/types'
 import { MODO_IMPORTACAO_ATIVO } from '@/lib/import-mode'
+import { calculateValorLiquido } from '@/services/pipeline'
 
 const BOM = '\uFEFF'
 
@@ -488,6 +489,9 @@ export async function importLeads(
       status: status as LeadStatus,
       status_financeiro: 'pago' as const,
       importado_csv: true,
+      // Garante que valor_liquido = valor_bruto quando não há desconto,
+      // seguindo a mesma regra do cadastro manual via LeadDetail.
+      valor_liquido: calculateValorLiquido(rest.valor_bruto, null),
       // perdido: registra o motivo da perda no campo correto da tabela
       ...(status === 'perdido' && motivo_perda
         ? { motivo_perda_tipo: 'outro' as const, motivo_perda_descricao: motivo_perda }

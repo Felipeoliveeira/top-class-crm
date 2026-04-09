@@ -299,48 +299,54 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
               </div>
             )}
 
-            <ScrollArea className="flex-1 border rounded-lg">
-              <div className="p-2 space-y-1">
-                {parseResults.map((row) => (
-                  <div
-                    key={row.rowIndex}
-                    className={`rounded-md p-3 text-sm ${
-                      row.success ? 'bg-surface-elevated' : 'bg-destructive/5 border border-destructive/20'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {row.success ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-destructive shrink-0" />
-                        )}
-                        <span className="font-medium truncate">
-                          {row.success && row.data ? row.data.nome : `Linha ${row.rowIndex}`}
-                        </span>
-                        {row.success && row.data && (
-                          <span className="text-muted-foreground text-xs shrink-0">
-                            {row.data.telefone}
-                            {' · '}
-                            <span className="capitalize">{row.data.status}</span>
-                            {row.data.servico_interesse && ` · ${SERVICO_LABELS[row.data.servico_interesse] ?? row.data.servico_interesse}`}
-                            {row.data.valor_bruto != null && ` · R$ ${row.data.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <ScrollArea className="h-full border rounded-lg">
+                <div className="p-2 space-y-1">
+                  {[...parseResults].sort((a, b) => {
+                    if (!a.success && b.success) return -1
+                    if (a.success && !b.success) return 1
+                    return a.rowIndex - b.rowIndex
+                  }).map((row) => (
+                    <div
+                      key={row.rowIndex}
+                      className={`rounded-md p-3 text-sm ${
+                        row.success ? 'bg-surface-elevated' : 'bg-destructive/5 border border-destructive/20'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {row.success ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                          )}
+                          <span className="font-medium truncate">
+                            {row.success && row.data ? row.data.nome : `Linha ${row.rowIndex}`}
                           </span>
-                        )}
+                          {row.success && row.data && (
+                            <span className="text-muted-foreground text-xs shrink-0">
+                              {row.data.telefone}
+                              {' · '}
+                              <span className="capitalize">{row.data.status}</span>
+                              {row.data.servico_interesse && ` · ${SERVICO_LABELS[row.data.servico_interesse] ?? row.data.servico_interesse}`}
+                              {row.data.valor_bruto != null && ` · R$ ${row.data.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0">Linha {row.rowIndex}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground shrink-0">Linha {row.rowIndex}</span>
+                      {!row.success && (
+                        <ul className="mt-2 ml-6 space-y-0.5">
+                          {row.errors.map((err, i) => (
+                            <li key={i} className="text-xs text-destructive">• {err}</li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
-                    {!row.success && (
-                      <ul className="mt-2 ml-6 space-y-0.5">
-                        {row.errors.map((err, i) => (
-                          <li key={i} className="text-xs text-destructive">• {err}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
 
             <div className="flex justify-end gap-3 mt-4 shrink-0">
               {validRows.length > 0 && (

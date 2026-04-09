@@ -1,6 +1,6 @@
 # PRD — CRM Top Class Escritório Virtual
 
-**Versão:** 1.2  
+**Versão:** 1.4  
 **Data:** 1 de abril de 2026  
 **Autor:** Product Manager (assistido por Claude claude-4.6-opus-high-thinking)  
 **Stack:** Lovable (UI) · Supabase (banco + auth + RLS + storage) · Cursor (dev) · Vercel (hospedagem frontend)  
@@ -40,7 +40,7 @@ O resultado é oportunidade de venda perdida sistematicamente por desorganizaç�
 CRM web próprio da Top Class com:
 
 - **Pipeline Kanban** de 4 etapas (Atendimento → Negociação → Fechado → Perdido) + status Inativo, com regras de progressão obrigatórias por etapa
-- **Dois perfis de acesso** — Admin (visão total) e Consultor Comercial (visão restrita aos próprios leads)
+- **Dois perfis de acesso** — Admin (gestão de usuários, **importação e exportação CSV**, reatribuição e exclusão de leads) e Consultor Comercial (acesso operacional a **todos** os leads cadastrados, independentemente do consultor responsável)
 - **Dashboards personalizados** por perfil com KPIs em tempo real
 - **Gestão documental** integrada via Supabase Storage
 - **Gate de pagamento** — lead só avança para Fechado com status financeiro "Pago"
@@ -113,7 +113,7 @@ A interface segue o padrão visual já validado pela Top Class:
 | **Papel** | Responsável pela operação comercial e gestão do time |
 | **Necessidades** | Visão completa do funil, performance por consultor, controle de receita, gestão de acessos |
 | **Dores** | Sem visibilidade de resultados, não sabe quais leads estão parados, não consegue medir conversão |
-| **Acesso no sistema** | Total — vê todos os leads, todos os dashboards, gerencia usuários, exporta CSV, reatribui leads |
+| **Acesso no sistema** | Total — vê todos os leads, todos os dashboards, gerencia usuários, importa e exporta CSV, reatribui leads |
 
 #### Persona 2: Consultor Comercial
 
@@ -122,7 +122,7 @@ A interface segue o padrão visual já validado pela Top Class:
 | **Papel** | Responsável por atender leads, conduzir negociações e fechar contratos |
 | **Necessidades** | Registrar leads rapidamente, avançar no funil, acompanhar seus resultados |
 | **Dores** | Perde leads por falta de organização, não sabe quantas vendas fez no mês, retrabalho de dados |
-| **Acesso no sistema** | Restrito aos próprios leads — não vê dados de outros consultores nem receita global |
+| **Acesso no sistema** | Acesso a **todos** os leads do CRM (listagem, pipeline, detalhe, documentos e histórico). Diferencia-se do Admin pela ausência de gestão de usuários, importação/exportação CSV, reatribuição de responsável e exclusão permanente de leads |
 
 ### 3.2 User Stories com Prioridade MoSCoW
 
@@ -131,7 +131,7 @@ A interface segue o padrão visual já validado pela Top Class:
 | ID | User Story | MoSCoW |
 |----|------------|--------|
 | US-01 | Como Admin, quero fazer login com e-mail e senha e ser direcionado automaticamente ao dashboard Admin, para acessar a visão completa do funil | **Must** |
-| US-02 | Como Consultor, quero fazer login com e-mail e senha e ser direcionado automaticamente ao dashboard Consultor, para ver apenas meus leads | **Must** |
+| US-02 | Como Consultor, quero fazer login com e-mail e senha e ser direcionado automaticamente ao dashboard Consultor, para acessar o funil e as métricas no layout do meu perfil | **Must** |
 | US-03 | Como usuário, quero recuperar minha senha via e-mail, para não depender do Admin quando esquecer a senha | **Must** |
 | US-04 | Como Consultor novo, quero definir minha senha pelo link de convite recebido por e-mail, para ter um primeiro acesso seguro e autônomo | **Must** |
 | US-05 | Como usuário, quero que o sistema não revele se um e-mail está cadastrado (nem no login, nem na recuperação), para proteger dados contra enumeração | **Must** |
@@ -154,9 +154,10 @@ A interface segue o padrão visual já validado pela Top Class:
 
 | ID | User Story | MoSCoW |
 |----|------------|--------|
-| US-15 | Como Consultor, quero visualizar a listagem dos meus leads com campos progressivos conforme o status, para ter contexto rápido sem abrir cada lead | **Must** |
-| US-16 | Como Admin, quero visualizar todos os leads de todos os consultores na listagem, para supervisionar o funil completo | **Must** |
+| US-15 | Como Consultor, quero visualizar a listagem de **todos** os leads cadastrados no CRM com campos progressivos conforme o status, para ter contexto rápido sem abrir cada lead | **Must** |
+| US-16 | Como Admin, quero a mesma visibilidade de listagem que o Consultor (todos os leads), com importação/exportação CSV e reatribuição exclusivas do meu perfil, para supervisionar e governar o funil | **Must** |
 | US-17 | Como Admin, quero exportar a listagem de leads em CSV (incluindo RG, CPF, CNPJ), para análises externas e relatórios | **Must** |
+| US-45 | Como Admin, quero importar múltiplos leads a partir de um arquivo CSV (modelo alinhado ao export), para migrar ou atualizar cadastros em lote com validação e relatório de erros por linha | **Must** |
 | US-18 | Como Admin, quero reatribuir um lead para outro consultor, para corrigir atribuições ou redistribuir carga | **Must** |
 | US-19 | Como Consultor ou Admin, quero inativar um lead com status "Fechado" (churn), para refletir que o cliente não renovou sem perder dados históricos | **Must** |
 | US-20 | Como usuário, quero buscar leads por nome, e-mail ou telefone e filtrar por status, origem, consultor e período, para localizar leads rapidamente | **Must** |
@@ -182,7 +183,7 @@ A interface segue o padrão visual já validado pela Top Class:
 | US-28 | Como Admin, quero ver gráficos de Leads e Ganhos por Dia, Leads por Origem, Clientes por Origem, Leads por Plano/Serviço e Clientes por Plano/Serviço, para comparar a distribuição geral de leads com os clientes efetivamente fechados e identificar canais e serviços mais eficazes | **Must** |
 | US-29 | Como Admin, quero ver a tabela de Performance por Consultor (Leads, Ganhos, Conversão, Valor Ganho), para avaliar o time individualmente | **Must** |
 | US-30 | Como Admin, quero filtrar todos os KPIs e gráficos por período (Hoje / 7 dias / 30 dias / Total), para analisar diferentes janelas temporais | **Must** |
-| US-31 | Como Consultor, quero ver meus KPIs individuais (Leads, Conversão, Fechados, Perdidos) e gráficos restritos aos meus leads, para acompanhar meu desempenho | **Must** |
+| US-31 | Como Consultor, quero ver KPIs e gráficos calculados sobre **todos** os leads do CRM no dashboard Consultor (sem a tabela de performance por consultor, exclusiva do Admin), para acompanhar a operação com a mesma base de dados que o pipeline | **Must** |
 
 #### Gestão de Usuários
 
@@ -219,7 +220,7 @@ A interface segue o padrão visual já validado pela Top Class:
 | ID | Descrição | Critérios de Aceite | MoSCoW |
 |----|-----------|---------------------|--------|
 | RF-01 | Login com e-mail e senha via Supabase Auth | 1. Campos e-mail e senha obrigatórios. 2. Credenciais válidas → redirect para `/dashboard`. 3. Credenciais inválidas → mensagem genérica sem revelar se e-mail existe. 4. Perfil determinado via consulta a `perfis.role` após auth | **Must** |
-| RF-02 | Direcionamento automático por perfil | 1. `role = admin` → dashboard Admin com visão total. 2. `role = consultor` → dashboard Consultor com dados restritos via RLS. 3. Perfil nunca exposto na tela de login | **Must** |
+| RF-02 | Direcionamento automático por perfil | 1. `role = admin` → dashboard Admin (KPIs completos, tabela de performance por consultor, importação/exportação CSV). 2. `role = consultor` → dashboard Consultor (layout e escopo de métricas conforme RF-30; **acesso a dados de leads** igual ao Admin, exceto ações exclusivas de Admin). 3. Perfil nunca exposto na tela de login | **Must** |
 | RF-03 | Recuperação de senha | 1. Usuário informa e-mail em `/recuperar-senha`. 2. Sistema exibe mensagem genérica idêntica independentemente de o e-mail existir. 3. `resetPasswordForEmail()` disparado via Supabase Auth. 4. Link expira em 1 hora. 5. Sem reenvio automático — usuário solicita novo link se necessário | **Must** |
 | RF-04 | Definir/redefinir senha | 1. Tela `/definir-senha` usada em dois contextos: primeiro acesso (convite) e recuperação. 2. Título dinâmico conforme contexto ("Crie sua senha" / "Redefina sua senha"). 3. Mínimo 8 caracteres. 4. Campos "Nova Senha" e "Confirmar Senha" devem coincidir — botão desabilitado se divergirem. 5. Token inválido/expirado → mensagem de erro + link para `/recuperar-senha`. 6. Sucesso → redirect para `/login` com mensagem de confirmação | **Must** |
 | RF-05 | Bloqueio de acesso para usuários inativos | 1. Usuário com `perfis.status = 'inativo'` não consegue acessar o sistema. 2. Sessão ativa é invalidada imediatamente quando o Admin desativa o perfil. 3. Dados e leads do consultor desativado permanecem intactos | **Must** |
@@ -232,7 +233,7 @@ A interface segue o padrão visual já validado pela Top Class:
 | RF-07 | Avanço Atendimento → Negociação | 1. Exige `origem` preenchido (Indicação / Google / Placa / Rede Social). 2. Exige `necessidade` preenchido (Escritório Virtual / Salas / Endereço Fiscal / Coworking). 3. Campos ausentes → bloqueio + alerta com campos faltantes destacados. 4. Todos preenchidos → status muda para `'negociacao'`. 5. Trigger Postgres registra em `pipeline_logs` | **Must** |
 | RF-08 | Avanço Negociação → Fechado | 1. Campos obrigatórios de serviço: `servico_interesse` (10 opções: Plano Pro, Plano Premium, Plano Top, Coworking, Sala Special Room, Mini Sala Reunião, Sala Reunião até 8, Sala Reunião até 12, Salas Fixas) e `valor_bruto`. 2. `porcentagem_desconto` opcional (0,01% a 100%). `valor_liquido` calculado automaticamente: `valor_bruto × (1 - porcentagem_desconto / 100)`. Se desconto vazio, líquido = bruto. Campo somente leitura. 3. Campos obrigatórios pessoais: E-mail, RG, CPF. 4. Se PJ (checkbox ativo): CNPJ e Razão Social obrigatórios adicionalmente. 5. Sócios: quando aplicável, nome e contato de cada sócio. 6. Ao menos 1 comprovante de residência enviado com nome/descrição. 7. `status_financeiro` deve ser `'pago'`. Se `status_financeiro = 'pendente'` → bloqueio + flag visual "⚠ Pagamento Pendente" + mensagem "Confirme o pagamento antes de fechar este lead." 8. **Vencimento:** `data_prevista_pagamento` obrigatório, inteiro entre 1 e 31 (dia do mês). 9. **Contrato:** `data_inicio_contrato` e `data_fim_contrato` obrigatórios (tipo `date`); data fim não pode ser anterior à data início. 10. **Nota fiscal:** `possui_nota_fiscal` obrigatório (`true` = Sim, `false` = Não); na UI, grupo de rádio "Possui Nota Fiscal?" com exatamente uma opção selecionada. 11. Todos os critérios atendidos → status muda para `'fechado'`. 12. Trigger Postgres (`fn_validate_lead_transition`) replica os gates 7–10. 13. Trigger Postgres registra em `pipeline_logs` | **Must** |
 | RF-09 | Movimentação para Perdido | 1. Disponível apenas em Atendimento e Negociação. 2. Modal com seleção obrigatória de motivo: Parou de responder / Sem interesse / Preço / Concorrência / Outro. 3. Se "Outro" → campo texto livre obrigatório. 4. Salva `motivo_perda_tipo` e `motivo_perda_descricao`. 5. Status muda para `'perdido'`. 6. Trigger Postgres registra em `pipeline_logs`. 7. Motivo de perda editável posteriormente | **Must** |
-| RF-10 | Inativação de cliente (churn) | 1. Disponível apenas para leads com `status = 'fechado'`. 2. Acessível para Admin e Consultor responsável. 3. Status muda para `'inativo'`. 4. Badge "Inativo" exibido na listagem e pipeline. 5. Lead excluído dos KPIs de Negócios Ganhos e Valor Total Ganho. 6. Dados e histórico preservados integralmente | **Must** |
+| RF-10 | Inativação de cliente (churn) | 1. Disponível apenas para leads com `status = 'fechado'`. 2. Acessível para Admin e Consultor (qualquer lead fechado, independentemente do responsável). 3. Status muda para `'inativo'`. 4. Badge "Inativo" exibido na listagem e pipeline. 5. Lead excluído dos KPIs de Negócios Ganhos e Valor Total Ganho. 6. Dados e histórico preservados integralmente | **Must** |
 | RF-11 | Drag-and-drop no Kanban (desktop) | 1. Arrastar card entre colunas aciona validação de regras de negócio. 2. Validação falha → card retorna à coluna de origem + mensagem de erro explicativa. 3. Validação sucede → movimentação confirmada com registro em `pipeline_logs` | **Should** |
 | RF-12 | Layout Kanban em 4 colunas | 1. Colunas: Atendimento, Negociação, Fechado, Perdido. 2. Contador de leads no cabeçalho de cada coluna. 3. Cards exibem: Nome (destaque), Origem (tag colorida — exibida apenas quando preenchida), Valor Líquido (vermelho se > 0 — exibido apenas quando preenchido), Consultor responsável, Data de cadastro. 4. Cards em Negociação com pagamento pendente exibem flag "⚠ Pagamento Pendente" | **Must** |
 
@@ -241,18 +242,19 @@ A interface segue o padrão visual já validado pela Top Class:
 | ID | Descrição | Critérios de Aceite | MoSCoW |
 |----|-----------|---------------------|--------|
 | RF-13 | Listagem com campos progressivos | 1. Leads em Atendimento: Nome, Telefone, Consultor, Data de Cadastro, Status. 2. A partir de Negociação: + Origem, Necessidade (Interesse). 3. Em Fechado: + Serviço de Interesse, Valor Bruto, Desconto (%), Valor Líquido, E-mail, CPF, RG, CNPJ, Razão Social, Documentos (ícone contagem), Status Financeiro. 4. Em Perdido: + Motivo da Perda (campos de Origem e Necessidade também visíveis se preenchidos) | **Must** |
-| RF-14 | Busca e filtros | 1. Busca por nome, e-mail ou telefone (campo único). 2. Filtros: Status, Origem, Consultor (Admin only), Período. 3. Filtros combináveis. 4. Ao aplicar/remover filtro, retorna à página 1 | **Must** |
+| RF-14 | Busca e filtros | 1. Busca por nome, e-mail ou telefone (campo único). 2. Filtros: Status, Origem, Consultor (responsável), Período — disponíveis para **Admin e Consultor**. 3. Filtros combináveis. 4. Ao aplicar/remover filtro, retorna à página 1 | **Must** |
 | RF-15 | Paginação | 1. Padrão: 25 leads por página. 2. Seletor: 25 / 50 / 100. 3. Botões Anterior/Próxima + input direto de página. 4. Total de registros exibido no rodapé ("Exibindo 1–25 de 143 leads"). 5. Respeita filtros ativos | **Should** |
-| RF-16 | Exportação CSV (Admin) | 1. Botão visível e funcional apenas para Admin. 2. Exporta todos os campos do lead, incluindo RG, CPF e CNPJ. 3. Respeita filtros ativos no momento da exportação. 4. Registra em `exportacoes_log`: Admin que exportou, total de registros, filtros aplicados. 5. Indisponível em mobile | **Must** |
-| RF-17 | Ações na listagem | 1. Ícone "Ver detalhes" (olho) — todos. 2. Ícone "Editar" (lápis) — todos. 3. Ícone "Reatribuir" (transferência) — Admin exclusivo. 4. Ícone "Inativar Cliente" — apenas para leads com `status = 'fechado'`, acessível para Admin e Consultor responsável | **Must** |
+| RF-16 | Exportação CSV (Admin) | 1. Botão "Exportar CSV" visível e funcional apenas para Admin (na listagem de leads). 2. Exporta todos os campos do lead, incluindo RG, CPF e CNPJ. 3. Respeita filtros ativos no momento da exportação. 4. Registra em `exportacoes_log`: Admin que exportou, total de registros, filtros aplicados. 5. Indisponível em mobile | **Must** |
+| RF-39 | Importação CSV (Admin) | 1. Botão "Importar CSV" visível e funcional apenas para Admin (na listagem de leads). 2. Fluxo: download de **modelo/template** (cabeçalhos e exemplo) alinhado ao layout do export quando possível; upload de arquivo `.csv` (UTF-8). 3. **Mínimo por linha:** Nome e Telefone obrigatórios — mesmo critério do cadastro manual (RF-06); demais colunas opcionais conforme mapeamento documentado (ex.: e-mail, consultor responsável por e-mail ou identificador acordado). 4. Cada linha válida cria um lead com `status = 'atendimento'` e `consultor_id` conforme coluna mapeada ou padrão definido na UI do import (ex.: Admin escolhe consultor padrão para linhas sem responsável). 5. Processamento com **pré-visualização** ou resumo (total de linhas, válidas/inválidas) antes de confirmar; linhas inválidas não são inseridas — relatório de erros com número da linha e motivo. 6. Limite máximo de linhas por arquivo **[ASSUMIDO: 1.000]** para proteção de performance (configurável). 7. Cada importação concluída registra em `importacoes_log` (RF-37). 8. Parsing e validação sensíveis **server-side** (Edge Function ou RPC com `service_role`) — nunca confiar apenas no cliente. 9. Indisponível em mobile | **Must** |
+| RF-17 | Ações na listagem | 1. Ícone "Ver detalhes" (olho) — Admin e Consultor. 2. Ícone "Editar" (lápis) — Admin e Consultor. 3. Ícone "Reatribuir" (transferência) — Admin exclusivo. 4. Ícone "Inativar Cliente" — apenas para leads com `status = 'fechado'`, acessível para Admin e Consultor (qualquer lead) | **Must** |
 
 ### Módulo 4: Detalhe e Edição do Lead
 
 | ID | Descrição | Critérios de Aceite | MoSCoW |
 |----|-----------|---------------------|--------|
 | RF-18 | Seções progressivas no detalhe | 1. Seção Dados Básicos: sempre visível (Nome, Telefone, Consultor, Data, Status). 2. Seção Qualificação: visível a partir de Atendimento para preenchimento, exibida a partir de Negociação (Origem, Necessidade/Interesse). 3. Seção Negociação e Contratuais: visível a partir de Negociação para preenchimento, exibida a partir de Fechado (Serviço de Interesse/Plano, Valor Bruto, Desconto %, Valor Líquido read-only, E-mail, RG, CPF, Contato, checkbox PJ → CNPJ + Razão Social, Sócios). 4. Seção Documentos. 5. Seção **Status Financeiro**: toggle Pago/Pendente; campo **Vencimento** (dia 1–31); **Data início do contrato** e **Data fim do contrato**; grupo de rádio **Possui Nota Fiscal?** (Sim / Não). Os itens de Vencimento, datas de contrato e nota fiscal são **obrigatórios para avançar a Fechado** (validação no detalhe e no banco). 6. Seção Histórico de Interações | **Must** |
-| RF-19 | Upload de documentos | 1. Área de upload com drag-and-drop. 2. Campo nome/descrição obrigatório por arquivo. 3. Comprovante de residência obrigatório para avançar a Fechado. 4. Formatos aceitos: DOC, DOCX, JPG, PDF. 5. Limite: 10MB por arquivo. 6. Quantidade ilimitada de arquivos. 7. Lista exibe nome, formato, data e botão de download. 8. Armazenamento via Supabase Storage. 9. Acesso: Consultor responsável + Admin | **Must** |
-| RF-20 | Histórico de interações | 1. Timeline vertical com anotações ordenadas cronologicamente. 2. Cada registro exibe: data, hora, nome do autor, texto. 3. Campo de nova anotação + botão "Registrar". 4. `created_at` automático do servidor. 5. Sem edição nem exclusão **isolada** de registros (imutabilidade via RLS); exclusão de linhas ocorre apenas quando o Admin exclui o lead inteiro (RF-24). 6. Admin pode registrar em qualquer lead; Consultor apenas nos seus | **Must** |
+| RF-19 | Upload de documentos | 1. Área de upload com drag-and-drop. 2. Campo nome/descrição obrigatório por arquivo. 3. Comprovante de residência obrigatório para avançar a Fechado. 4. Formatos aceitos: DOC, DOCX, JPG, PDF. 5. Limite: 10MB por arquivo. 6. Quantidade ilimitada de arquivos. 7. Lista exibe nome, formato, data e botão de download. 8. Armazenamento via Supabase Storage. 9. Acesso download/upload: Admin e Consultor autenticados em **qualquer** lead | **Must** |
+| RF-20 | Histórico de interações | 1. Timeline vertical com anotações ordenadas cronologicamente. 2. Cada registro exibe: data, hora, nome do autor, texto. 3. Campo de nova anotação + botão "Registrar". 4. `created_at` automático do servidor. 5. Sem edição nem exclusão **isolada** de registros (imutabilidade via RLS); exclusão de linhas ocorre apenas quando o Admin exclui o lead inteiro (RF-24). 6. Admin e Consultor podem registrar anotações em **qualquer** lead | **Must** |
 | RF-21 | Checkbox Pessoa Jurídica | 1. Ao ativar, campos CNPJ e Razão Social tornam-se obrigatórios. 2. Ao desativar, campos CNPJ e Razão Social voltam a ser opcionais (nullable) | **Must** |
 | RF-22 | Gestão de sócios | 1. Botão "+ Adicionar Sócio" disponível no detalhe. 2. Campos por sócio: nome e contato. 3. Armazenamento em JSONB (`socios`). 4. Opcional — não impede avanço de etapa | **Must** |
 | RF-23 | Status financeiro | 1. Toggle Pago/Pendente. 2. **Vencimento:** campo numérico (rótulo na UI: "Vencimento") para dia fixo do mês (1 a 31), mapeado a `data_prevista_pagamento` — **obrigatório para fechar** o lead (junto aos demais gates de RF-08). 3. **Datas de contrato:** "Data início do contrato" e "Data fim do contrato" (inputs de data) — **obrigatórias para fechar**; data fim ≥ data início. 4. **Possui Nota Fiscal?:** grupo de rádio horizontal **Sim** / **Não** — **obrigatório** escolher uma opção para fechar (`possui_nota_fiscal` = `true` ou `false`). 5. Se Pendente: alerta vermelho "⚠ Pagamento pendente — lead não pode ser fechado." 6. Alteração de Pendente → Pago é condição necessária (mas não suficiente) para o avanço a Fechado | **Must** |
@@ -267,7 +269,7 @@ A interface segue o padrão visual já validado pela Top Class:
 | RF-27 | Dashboard Admin — Gráficos (Linhas 3-5) | 1. Leads e Ganhos por Dia: gráfico de linha dupla (leads em branco/cinza, ganhos em vermelho). 2. Leads por Origem: gráfico de barras verticais (Indicação, Google, Placa, Rede Social) — considera **todos** os leads independente do status. 3. Clientes por Origem: gráfico de barras verticais (mesmas categorias) — considera **apenas** leads com `status = 'fechado'`. 4. Leads por Plano/Serviço: barras horizontais com nome do plano e quantidade — considera **todos** os leads que possuem `servico_interesse` preenchido, independente do status. 5. Clientes por Plano/Serviço: barras horizontais (mesmas categorias) — considera **apenas** leads com `status = 'fechado'` | **Must** |
 | RF-28 | Dashboard Admin — Tabela Performance (Linha 5) | 1. Colunas: Consultor, Leads, Ganhos, Conversão (%), Valor Ganho (R$). 2. Dados calculados por consultor individual. 3. Valor Ganho considera apenas `status_financeiro = 'pago'` | **Must** |
 | RF-29 | Dashboard Admin — Filtros temporais | Filtros: Hoje / 7 dias / 30 dias / Total. Afetam todos os cards, gráficos e tabelas simultaneamente | **Must** |
-| RF-30 | Dashboard Consultor | 1. Cards: Leads Totais (próprios), Taxa de Conversão, Negócios Fechados, Negócios Perdidos (quantidade). 2. Sem Valor Total Ganho, sem Somatório de Descontos, sem Valor de Negócios Perdidos. 3. Gráficos: Leads e Ganhos por Dia, Leads por Origem, Clientes por Origem, Leads por Plano/Serviço, Clientes por Plano/Serviço — todos restritos via RLS aos leads próprios. 4. Sem tabela de Performance por Consultor. 5. Sem visibilidade de dados de outros consultores | **Must** |
+| RF-30 | Dashboard Consultor | 1. Cards: Leads Totais, Taxa de Conversão, Negócios Fechados, Negócios Perdidos (quantidade) — calculados sobre **todos** os leads do CRM (mesma base que o pipeline). 2. Sem Valor Total Ganho (R$), sem Somatório de Descontos, sem Valor de Negócios Perdidos (permanecem exclusivos do dashboard Admin). 3. Gráficos: Leads e Ganhos por Dia, Leads por Origem, Clientes por Origem, Leads por Plano/Serviço, Clientes por Plano/Serviço — sobre **todos** os leads. 4. Sem tabela de Performance por Consultor (exclusiva do Admin). 5. Diferença em relação ao Admin: conjunto reduzido de KPIs em R$ e ausência da tabela por consultor; não há ocultação de leads por `consultor_id` | **Must** |
 
 ### Módulo 6: Gestão de Usuários (Admin)
 
@@ -282,14 +284,14 @@ A interface segue o padrão visual já validado pela Top Class:
 
 | ID | Descrição | Critérios de Aceite | MoSCoW |
 |----|-----------|---------------------|--------|
-| RF-35 | Reatribuição de lead | 1. Ação disponível na listagem e no detalhe do lead — Admin exclusivo (oculta para Consultor via RLS + UI). 2. Modal com seleção de consultor ativo. 3. Atualiza `leads.consultor_id`. 4. Registra em `pipeline_logs` com observação automática: "Lead reatribuído de [Consultor A] para [Consultor B]" | **Must** |
+| RF-35 | Reatribuição de lead | 1. Ação disponível na listagem e no detalhe do lead — **Admin exclusivo** (oculta para Consultor na UI; políticas RLS impedem `UPDATE` de `consultor_id` por Consultor). 2. Modal com seleção de consultor ativo. 3. Atualiza `leads.consultor_id`. 4. Registra em `pipeline_logs` com observação automática: "Lead reatribuído de [Consultor A] para [Consultor B]" | **Must** |
 
 ### Módulo 8: Auditoria e Logs
 
 | ID | Descrição | Critérios de Aceite | MoSCoW |
 |----|-----------|---------------------|--------|
 | RF-36 | Pipeline logs via trigger | 1. Toda alteração de `leads.status` gera registro automático em `pipeline_logs`. 2. Campos: lead_id, executado_por, status_anterior, status_novo, observacao, created_at. 3. Tabela somente leitura para usuários — inserção apenas via trigger Postgres. 4. Nenhum perfil tem permissão direta de UPDATE ou DELETE via RLS; remoção de linhas de `pipeline_logs` ocorre somente em cascata quando o Admin exclui o lead via `fn_excluir_lead_admin` (RF-24) | **Must** |
-| RF-37 | Log de exportações CSV | 1. Cada exportação CSV gera registro em `exportacoes_log`. 2. Campos: exportado_por (Admin), total_registros, filtros_aplicados (JSONB), created_at. 3. Somente Admin tem SELECT e INSERT | **Must** |
+| RF-37 | Logs de exportação e importação CSV | **Exportação:** 1. Cada exportação CSV gera registro em `exportacoes_log`. 2. Campos: `exportado_por` (Admin), `total_registros`, `filtros_aplicados` (JSONB), `created_at`. 3. Somente Admin tem SELECT e INSERT em `exportacoes_log`. **Importação:** 4. Cada importação CSV concluída gera registro em `importacoes_log`. 5. Campos sugeridos: `importado_por` (Admin), `total_linhas_arquivo`, `total_inseridos`, `total_falhas`, `detalhe_erros` (JSONB opcional — amostra ou referência ao relatório), `created_at`. 6. Somente Admin tem SELECT e INSERT em `importacoes_log` | **Must** |
 | RF-38 | Atualização automática de `ultima_movimentacao_at` | 1. Trigger Postgres atualiza `leads.ultima_movimentacao_at` quando: (a) `leads.status` é alterado, ou (b) novo registro inserido em `historico_interacoes` para o lead. 2. Campo não editável pelo frontend | **Must** |
 
 ---
@@ -313,8 +315,8 @@ A interface segue o padrão visual já validado pela Top Class:
 | RNF-06 | Prevenção de enumeração de usuários | Mensagens genéricas de erro | Login e recuperação de senha exibem a mesma mensagem independentemente de o e-mail existir |
 | RNF-07 | Expiração de tokens | Supabase Auth nativo | Token de convite: 24h. Token de recuperação: 1h |
 | RNF-08 | Rate limiting de APIs | Configuração na Vercel | Rate limiting padrão da Vercel para chamadas ao banco, prevenindo sobrecarga |
-| RNF-09 | RLS (Row Level Security) | Supabase RLS | Todas as tabelas com políticas RLS ativas conforme definido na Seção 6. Consultor nunca acessa dados de outro consultor |
-| RNF-10 | Isolamento de arquivos no Storage | Supabase Storage + RLS | Consultor acessa apenas documentos dos seus leads. Admin acessa todos |
+| RNF-09 | RLS (Row Level Security) | Supabase RLS | Todas as tabelas com políticas RLS ativas conforme definido na Seção 6. Consultor e Admin **leem e atualizam** leads e dados relacionados (histórico, documentos, logs de pipeline) de forma **equivalente** quanto ao escopo de linhas; permissões diferenciadas aplicam-se a ações administrativas (ex.: reatribuição de `consultor_id`, exclusão de lead, `exportacoes_log`, `importacoes_log`) |
+| RNF-10 | Acesso a arquivos no Storage | Supabase Storage + RLS | Admin e Consultor autenticados acessam documentos de **qualquer** lead conforme políticas alinhadas à tabela `leads` |
 | RNF-11 | Imutabilidade do histórico | RLS sem UPDATE/DELETE direto em `historico_interacoes` | Nenhum perfil consegue editar ou apagar anotações isoladamente. A remoção de interações ocorre apenas quando o Admin exclui o lead inteiro (RF-24), via função Postgres com privilégios elevados |
 | RNF-12 | Acesso individual e intransferível | Autenticação por e-mail/senha | Cada usuário possui credenciais únicas. Sem login compartilhado |
 
@@ -323,11 +325,11 @@ A interface segue o padrão visual já validado pela Top Class:
 | ID | Requisito | Implementação | Critério de Aceite |
 |----|-----------|---------------|-------------------|
 | RNF-13 | Minimização de dados | Campos obrigatórios apenas quando necessários por etapa | Cadastro exige apenas nome e telefone. Origem e interesse coletados na Negociação. Dados pessoais (RG, CPF, CNPJ), dados de serviço (serviço de interesse, valor) e documentos coletados apenas na fase de Fechado, não antecipadamente |
-| RNF-14 | Controle de acesso a dados sensíveis | RLS + perfis de acesso | RG, CPF e CNPJ acessíveis apenas pelo Consultor responsável e Admin. Sem acesso cruzado entre consultores |
-| RNF-15 | Rastreabilidade de acesso e exportação | `exportacoes_log` + `pipeline_logs` | Toda exportação CSV (que inclui dados sensíveis) é registrada com identificação do Admin, timestamp e filtros aplicados |
+| RNF-14 | Controle de acesso a dados sensíveis | RLS + perfis de acesso | RG, CPF e CNPJ visíveis a **Admin e Consultor** autenticados nos leads do CRM. **Importação e exportação** em CSV com dados sensíveis ou em lote permanecem **exclusivas do Admin** (RF-16, RF-39, RNF-18) |
+| RNF-15 | Rastreabilidade de acesso, exportação e importação | `exportacoes_log`, `importacoes_log` + `pipeline_logs` | Toda exportação CSV (dados sensíveis) e todo lote de importação CSV são registrados com identificação do Admin e timestamp; exportação inclui filtros aplicados quando houver |
 | RNF-16 | Retenção e preservação de dados | Padrão: dados mantidos indefinidamente | Leads perdidos e inativos preservam todos os dados para auditoria e BI. **Exceção:** o Admin pode excluir permanentemente um lead específico (RF-24), removendo lead, histórico, documentos (Storage + metadados) e `pipeline_logs` associados — uso restrito a casos procedentes (ex.: exercício de direitos do titular, duplicidade, erro grave) |
 | RNF-17 | Segurança no armazenamento de documentos | Supabase Storage com RLS | Documentos contratuais (comprovantes, RG, contratos) armazenados com acesso controlado. Sem acesso público |
-| RNF-18 | Exportação CSV com dados sensíveis | Admin exclusivo + log | Exportação restrita ao Admin. Cada exportação gera registro auditável. Funcionalidade indisponível em mobile (reduz risco de exportação em dispositivos menos seguros) |
+| RNF-18 | Importação e exportação CSV (lote / dados sensíveis) | Admin exclusivo + logs | Importação e exportação CSV restritas ao Admin. Cada operação gera registro auditável (`importacoes_log` / `exportacoes_log`). Funcionalidades indisponíveis em mobile (reduz risco em dispositivos menos seguros) |
 | RNF-18a | Direito de exclusão (Art. 18 LGPD) — atendimento operacional | Exclusão integral pelo Admin (RF-24) + evidência externa | Quando houver solicitação fundamentada do titular (ou decisão interna documentada para duplicidade/erro), o Admin executa a exclusão permanente no detalhe do lead, após confirmação no modal. **Recomenda-se** manter comprovante da solicitação ou decisão **fora do CRM** (protocolo, e-mail, termo), pois o sistema não registra log dedicado de exclusões após a remoção dos dados. Avaliar anonimização parcial em versões futuras quando a exclusão total não for obrigatória |
 | [⚠️ LACUNA] | Termo de consentimento | A definir | Não há registro de consentimento do lead para tratamento dos seus dados pessoais. Recomenda-se avaliar se o consentimento é coletado fora do CRM (ex: formulário de contato, contrato) ou se deve ser incorporado ao sistema em versão futura |
 
@@ -349,7 +351,7 @@ A interface segue o padrão visual já validado pela Top Class:
 | RNF-25 | Mobile — listagem como cards | Tabela colapsa para cards verticais: Nome, Status (badge), Origem, Data. Botão "Ver detalhes" |
 | RNF-26 | Mobile — dashboard adaptado | KPIs empilhados, gráficos full-width com scroll horizontal, tabela Performance como cards |
 | RNF-27 | Mobile — pipeline como lista | Kanban substituído por lista agrupada por status com filtro no topo. Drag-and-drop substituído por "Avançar Etapa" e "Marcar como Perdido" |
-| RNF-28 | Mobile — funcionalidades restritas | Exportação CSV indisponível em mobile |
+| RNF-28 | Mobile — funcionalidades restritas | Importação e exportação CSV indisponíveis em mobile |
 
 ### 5.6 Backup e Retenção
 
@@ -422,7 +424,7 @@ A interface segue o padrão visual já validado pela Top Class:
 | Coluna | Tipo | Restrições | Descrição |
 |--------|------|------------|-----------|
 | `id` | bigint | PK, auto-increment | ID do lead |
-| `consultor_id` | UUID | FK → `perfis`, NOT NULL | Consultor responsável (chave para RLS) |
+| `consultor_id` | UUID | FK → `perfis`, NOT NULL | Consultor responsável (atribuição comercial, reatribuição e relatórios por consultor; não restringe leitura/edição operacional dos demais perfis) |
 | `nome` | text | NOT NULL | Nome do lead |
 | `telefone` | text | NOT NULL | Telefone de contato |
 | `origem` | enum | Nullable. Valores: `'indicacao'`, `'google'`, `'placa'`, `'rede_social'` | Canal de aquisição. Obrigatório para avançar a Negociação |
@@ -495,6 +497,18 @@ A interface segue o padrão visual já validado pela Top Class:
 | `filtros_aplicados` | JSONB | Nullable | Snapshot dos filtros ativos |
 | `created_at` | timestamptz | DEFAULT `now()` | Timestamp da exportação |
 
+#### Tabela: `importacoes_log`
+
+| Coluna | Tipo | Restrições | Descrição |
+|--------|------|------------|-----------|
+| `id` | bigint | PK, auto-increment | ID do registro de importação |
+| `importado_por` | UUID | FK → `perfis`, NOT NULL | Admin que executou a importação |
+| `total_linhas_arquivo` | integer | NOT NULL | Quantidade de linhas de dados processadas (excl. cabeçalho) |
+| `total_inseridos` | integer | NOT NULL | Linhas que geraram lead com sucesso |
+| `total_falhas` | integer | NOT NULL | Linhas rejeitadas |
+| `detalhe_erros` | JSONB | Nullable | Resumo ou amostra de erros por linha (opcional) |
+| `created_at` | timestamptz | DEFAULT `now()` | Timestamp da conclusão da importação |
+
 ### 6.3 Diagrama de Relacionamentos
 
 ```
@@ -507,12 +521,12 @@ auth.users ──── 1:1 ──── perfis
            leads    historico_interacoes     pipeline_logs
               │         (autor_id)          (executado_por)
               │
-     ┌────────┼────────────┬─────────────┐
-     │        │            │             │
-  1:N      1:N          1:N           1:N
-     │        │            │             │
-historico  documentos   pipeline     exportacoes_log
-interacoes  _lead        _logs      (Admin only)
+     ┌────────┼────────────┬─────────────┬─────────────┬─────────────┐
+     │        │            │             │             │             │
+  1:N      1:N          1:N           1:N           1:N
+     │        │            │             │             │             │
+historico  documentos   pipeline     exportacoes_log  importacoes_log
+interacoes  _lead        _logs      (Admin only)     (Admin only)
 (lead_id)  (lead_id)    (lead_id)
 ```
 
@@ -522,17 +536,19 @@ interacoes  _lead        _logs      (Admin only)
 
 | Operação | Admin | Consultor |
 |----------|-------|-----------|
-| SELECT | Todos os registros | Apenas onde `consultor_id = auth.uid()` |
-| INSERT | Sim (qualquer `consultor_id`) | Sim (apenas `consultor_id = auth.uid()`) |
-| UPDATE | Todos os registros | Apenas onde `consultor_id = auth.uid()` |
-| DELETE | Não permitido | Não permitido |
+| SELECT | Todos os registros | Todos os registros |
+| INSERT | Sim (qualquer `consultor_id` válido) | Sim (`consultor_id` = `auth.uid()` — RF-06) |
+| UPDATE | Todos os registros (inclui `consultor_id` para reatribuição) | Todos os registros **exceto** alteração de `consultor_id` (reatribuição apenas Admin — RF-35; implementar via política RLS ou trigger que preserve `consultor_id` em `UPDATE` por Consultor) |
+| DELETE | Não permitido (exceto fluxo controlado RF-24 / função privilegiada) | Não permitido |
+
+> **Nota de implementação:** O Consultor deve poder atualizar campos operacionais de qualquer lead; a coluna `consultor_id` só pode ser alterada pelo Admin (política `WITH CHECK` / coluna protegida ou Edge Function).
 
 #### Tabela `historico_interacoes`
 
 | Operação | Admin | Consultor |
 |----------|-------|-----------|
-| SELECT | Todos os registros | Apenas de leads com `consultor_id = auth.uid()` |
-| INSERT | Qualquer lead | Apenas leads com `consultor_id = auth.uid()` |
+| SELECT | Todos os registros | Todos os registros |
+| INSERT | Qualquer lead | Qualquer lead |
 | UPDATE | **Bloqueado** | **Bloqueado** |
 | DELETE | **Bloqueado** | **Bloqueado** |
 
@@ -540,8 +556,8 @@ interacoes  _lead        _logs      (Admin only)
 
 | Operação | Admin | Consultor |
 |----------|-------|-----------|
-| SELECT | Todos | Apenas documentos de leads com `consultor_id = auth.uid()` |
-| INSERT | Qualquer lead | Apenas leads com `consultor_id = auth.uid()` |
+| SELECT | Todos | Todos |
+| INSERT | Qualquer lead | Qualquer lead |
 | UPDATE | Não permitido | Não permitido |
 | DELETE | Não permitido | Não permitido |
 
@@ -556,12 +572,21 @@ interacoes  _lead        _logs      (Admin only)
 
 | Operação | Admin | Consultor |
 |----------|-------|-----------|
-| SELECT | Todos | Apenas logs de leads com `consultor_id = auth.uid()` |
+| SELECT | Todos | Todos |
 | INSERT | Via trigger apenas | Via trigger apenas |
 | UPDATE | **Bloqueado** | **Bloqueado** |
 | DELETE | **Bloqueado** | **Bloqueado** |
 
 #### Tabela `exportacoes_log`
+
+| Operação | Admin | Consultor |
+|----------|-------|-----------|
+| SELECT | Todos | **Bloqueado** |
+| INSERT | Sim | **Bloqueado** |
+| UPDATE | **Bloqueado** | **Bloqueado** |
+| DELETE | **Bloqueado** | **Bloqueado** |
+
+#### Tabela `importacoes_log`
 
 | Operação | Admin | Consultor |
 |----------|-------|-----------|
@@ -588,7 +613,7 @@ interacoes  _lead        _logs      (Admin only)
 | Limite por arquivo | 10MB |
 | Formatos aceitos | DOC, DOCX, JPG, PDF |
 | Quantidade por lead | Ilimitada |
-| Acesso | RLS: Consultor do lead + Admin |
+| Acesso | RLS: Admin e qualquer Consultor autenticado (objetos referentes a leads acessíveis conforme políticas alinhadas à tabela `leads`) |
 
 ### 6.7 Integrações
 
@@ -596,7 +621,8 @@ interacoes  _lead        _logs      (Admin only)
 |---------|------|-----|------|
 | **Supabase Auth** | Nativa | Autenticação, convite (`inviteUserByEmail()`), recuperação de senha (`resetPasswordForEmail()`), gestão de sessão | MVP |
 | **Supabase Storage** | Nativa | Armazenamento de documentos contratuais com RLS | MVP |
-| **Supabase RLS** | Nativa | Regras de negócio no banco: isolamento, imutabilidade, gates | MVP |
+| **Supabase RLS** | Nativa | Regras de negócio no banco: controle por papel (ações administrativas vs operação), imutabilidade, gates | MVP |
+| **Supabase Edge Functions** (ou RPC privilegiada) | Recomendada para importação CSV | Parsing, validação e inserção em lote de leads (RF-39) com `service_role`, fora do cliente | MVP |
 | **Vercel** | Hospedagem | Frontend hosting com rate limiting padrão | MVP |
 | **n8n** | Webhook/API | Notificações, alertas de inatividade, integração WhatsApp | V2.0 |
 
@@ -612,12 +638,12 @@ interacoes  _lead        _logs      (Admin only)
 |--------|--------|
 | Autenticação | Login, recuperação de senha, definição de senha, direcionamento por perfil, bloqueio de inativos |
 | Pipeline Kanban | 4 colunas + status Inativo, cadastro de lead, regras de progressão completas, gate de pagamento, movimentação para Perdido |
-| Gestão de Leads | Listagem com campos progressivos, busca, filtros, paginação, exportação CSV (Admin) |
+| Gestão de Leads | Listagem com campos progressivos, busca, filtros, paginação, importação e exportação CSV (Admin) |
 | Detalhe do Lead | Seções progressivas, upload de documentos, histórico imutável, status financeiro (Pago/Pendente, Vencimento, datas de contrato, nota fiscal Sim/Não com gates ao fechar), gestão de sócios |
-| Dashboards | Dashboard Admin completo (KPIs, gráficos, performance por consultor, filtros temporais). Dashboard Consultor com visão restrita |
+| Dashboards | Dashboard Admin completo (KPIs, gráficos, performance por consultor, filtros temporais). Dashboard Consultor com o mesmo universo de leads nos gráficos principais, sem tabela de performance por consultor e sem alguns KPIs em R$ do Admin |
 | Gestão de Usuários | Cadastro via convite, ativar/desativar, reenviar convite |
 | Reatribuição | Admin reatribui leads entre consultores |
-| Auditoria | Pipeline logs via trigger, log de exportações, `ultima_movimentacao_at` automático |
+| Auditoria | Pipeline logs via trigger, logs de exportação e importação CSV, `ultima_movimentacao_at` automático |
 | RLS | Todas as políticas implementadas |
 | Responsividade | Desktop completo (1280px+) |
 
@@ -629,7 +655,7 @@ interacoes  _lead        _logs      (Admin only)
 
 | Módulo | Escopo |
 |--------|--------|
-| Responsividade mobile | Login, Recuperar/Definir Senha, Detalhe do Lead responsivos. Listagem como cards. Dashboard adaptado. Pipeline como lista agrupada com filtro. Restrição de CSV em mobile |
+| Responsividade mobile | Login, Recuperar/Definir Senha, Detalhe do Lead responsivos. Listagem como cards. Dashboard adaptado. Pipeline como lista agrupada com filtro. Importação e exportação CSV indisponíveis em mobile |
 | Drag-and-drop | Kanban com arraste entre colunas + validação de regras de negócio (desktop) |
 | Refinamentos | Ajustes de UX baseados em feedback do time. Otimização de queries para performance |
 
@@ -652,8 +678,8 @@ interacoes  _lead        _logs      (Admin only)
 |---|-------|---------------|---------|-----------|
 | R1 | **Adoção pelo Consultor** — Resistência ao uso do CRM por ser mais trabalhoso que o processo informal atual | Alta | Alto | Pipeline impõe disciplina mínima com poucos campos por etapa. Interface Kanban visual e intuitiva. Treinamento inicial antes do go-live |
 | R2 | **Perda de dados por falha do Supabase** | Baixa | Crítico | Backup diário nativo do Supabase + PITR conforme tier contratado. Imutabilidade operacional de `historico_interacoes` e `pipeline_logs` (sem alteração pelo usuário) como camada adicional de rastreabilidade; exclusão desses registros só ocorre com exclusão integral do lead pelo Admin (RF-24) |
-| R3 | **Escalação de privilégios** — Consultor tenta acessar dados de outros leads | Média | Alto | RLS implementado no nível do banco (Supabase). Mesmo que o frontend seja comprometido, o banco bloqueia acessos indevidos |
-| R4 | **Vazamento de dados pessoais (LGPD)** — Exportação CSV com CPF/RG cai em mãos erradas | Média | Alto | Exportação restrita ao Admin. Cada exportação logada. CSV indisponível em mobile. [⚠️ LACUNA: considerar criptografia ou mascaramento parcial de CPF/RG no CSV em versões futuras] |
+| R3 | **Escalação de privilégios** — Usuário tenta ações fora do seu papel (ex.: reatribuir lead, importar/exportar CSV, excluir lead) | Média | Alto | RLS e validações no banco restringem `UPDATE` de `consultor_id`, `DELETE` de leads e operações em `exportacoes_log` e `importacoes_log` conforme o papel. Importação em lote executada com privilégio server-side. Mesmo com frontend comprometido, ações administrativas críticas permanecem bloqueadas para Consultor |
+| R4 | **Vazamento ou corrupção de dados pessoais (LGPD)** — Exportação CSV com CPF/RG em mãos erradas; importação CSV com dados incorretos ou duplicados | Média | Alto | Importação e exportação restritas ao Admin; logs em `importacoes_log` e `exportacoes_log`. CSV indisponível em mobile. Validação linha a linha na importação com relatório de erros; [⚠️ LACUNA: considerar criptografia ou mascaramento parcial de CPF/RG no CSV em versões futuras] |
 | R5 | **Token de convite expirado** — Consultor não clica no link em 24h e perde acesso | Média | Baixo | Admin pode reenviar convite com um clique. Visibilidade na tela de Gestão de Usuários |
 | R6 | **Performance degradada com volume crescente** — Dashboards e listagem ficam lentos com muitos leads | Baixa (MVP) | Médio | Paginação padrão de 25 leads. Filtros temporais limitam escopo de queries. `valor_liquido` salvo no banco para evitar cálculos em tempo de query. Índices nas colunas de FK e status |
 | R7 | **Indisponibilidade do Supabase** — Downtime do provedor afeta toda a operação | Baixa | Crítico | Supabase oferece SLA de alta disponibilidade em planos pagos. Sem fallback local previsto no MVP — risco aceito |
@@ -682,7 +708,7 @@ Os itens abaixo estão **explicitamente excluídos** do escopo deste PRD e do de
 | Backup customizado / dump manual | Dependência do backup nativo do Supabase |
 | Exclusão de leads pelo Consultor | Consultores não excluem leads; podem inativar clientes fechados (RF-10). A exclusão permanente é exclusiva do Admin no detalhe (RF-24) |
 | Exclusão em massa / purge automatizado | Sem ferramenta de exclusão por lote, filtros ou job agendado; apenas exclusão individual confirmada pelo Admin |
-| Importação de leads em massa (CSV/Excel) | Cadastro é individual pelo pipeline. Importação em massa não prevista no MVP |
+| Importação em formatos que não sejam CSV | Apenas `.csv` (UTF-8) no escopo; Excel nativo (.xlsx) fora do escopo salvo conversão prévia pelo usuário |
 
 ---
 
@@ -706,7 +732,7 @@ As seguintes capturas de tela representam a direção visual e de UX aprovada pa
 
 1. **Dashboard Admin** — Tema escuro, cards KPI com ícones de tendência, gráficos de linha e barras, tabela de performance por consultor
 2. **Pipeline Kanban** — 4 colunas com cards contendo nome, empresa, valor, origem e data. Botão "+ Novo Lead" vermelho no topo
-3. **Listagem de Leads** — Tabela com colunas progressivas, busca, filtros, ações por linha, botão "Exportar CSV"
+3. **Listagem de Leads** — Tabela com colunas progressivas, busca, filtros, ações por linha, botões "Importar CSV" e "Exportar CSV" (Admin)
 4. **Tela de Login** — Layout centralizado, fundo escuro, logo "top class.", campos e-mail/senha, botão vermelho "Entrar"
 
 ---

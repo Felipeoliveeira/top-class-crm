@@ -442,8 +442,8 @@ export default function LeadDetailPage() {
   }
 
   const canAdvance = lead.status === 'atendimento' || lead.status === 'negociacao'
-  const canLose = (lead.status === 'atendimento' || lead.status === 'negociacao') && canMarkAsLost(lead.consultor_id)
-  const canInactivate = lead.status === 'fechado' && canInactivateLead(lead.consultor_id)
+  const canLose = (lead.status === 'atendimento' || lead.status === 'negociacao') && canMarkAsLost()
+  const canInactivate = lead.status === 'fechado' && canInactivateLead()
 
   const handleDownloadDocumento = async (doc: DocumentoLead) => {
     const storagePath = getStoragePathFromArquivoUrl(doc.arquivo_url)
@@ -899,7 +899,7 @@ export default function LeadDetailPage() {
           <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openSections.historico && 'rotate-180')} />
         </CollapsibleTrigger>
         <CollapsibleContent className="rounded-b-lg border border-t-0 border-border bg-card p-4 space-y-4">
-          {canAddInteraction(lead.consultor_id) && (
+          {canAddInteraction() && (
             <div className="space-y-2">
               <Textarea placeholder="Registrar nova anotação..." value={newNote} onChange={e => setNewNote(e.target.value)} className="bg-background border-border min-h-[80px]" />
               <Button

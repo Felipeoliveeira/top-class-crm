@@ -3,20 +3,26 @@ import { useAuth } from './useAuth'
 export function usePermissions() {
   const { isAdmin, isConsultor, user } = useAuth()
 
+  const isAuthenticated = isAdmin || isConsultor
+
   return {
-    canViewAllLeads: isAdmin,
+    // Todos os usuários autenticados veem e operam todos os leads (PRD RF-02, US-31)
+    canViewAllLeads: isAuthenticated,
     canAssignConsultor: isAdmin,
     canReassignLead: isAdmin,
     canExportCsv: isAdmin,
     canImportCsv: isAdmin,
     canManageUsers: isAdmin,
+    // Dashboard: tabela de performance e KPIs financeiros em R$ exclusivos do Admin
     canViewPerformanceTable: isAdmin,
     canViewFinancialKpis: isAdmin,
-    canViewAllDashboard: isAdmin,
+    // Ambos os perfis veem todos os leads no dashboard (sem restrição por consultor_id)
+    canViewAllDashboard: isAuthenticated,
     canDeleteLead: isAdmin,
-    canInactivateLead: (consultorId: string) => isAdmin || (isConsultor && user?.id === consultorId),
-    canMarkAsLost: (consultorId: string) => isAdmin || (isConsultor && user?.id === consultorId),
-    canAddInteraction: (consultorId: string) => isAdmin || (isConsultor && user?.id === consultorId),
+    // Qualquer usuário autenticado pode inativar, marcar como perdido e adicionar interações em qualquer lead
+    canInactivateLead: () => isAuthenticated,
+    canMarkAsLost: () => isAuthenticated,
+    canAddInteraction: () => isAuthenticated,
     canEditLead: true,
     isOwnLead: (consultorId: string) => user?.id === consultorId,
   }
