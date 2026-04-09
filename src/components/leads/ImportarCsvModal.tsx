@@ -16,7 +16,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAuth } from '@/hooks/useAuth'
 import {
   buildCsvTemplate,
+  buildExcelTemplate,
   parseImportCsv,
+  xlsxToCsvText,
   importLeads,
   type ImportRowResult,
   type ImportLeadsResult,
@@ -77,24 +79,53 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
     URL.revokeObjectURL(url)
   }
 
-  function processFile(file: File) {
-    if (!file.name.endsWith('.csv')) {
-      toast.error('Apenas arquivos .csv são aceitos.')
+  function handleDownloadExcelTemplate() {
+    const blob = buildExcelTemplate()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'template_importacao_leads.xlsx'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function handleParsedCsv(text: string) {
+    const results = parseImportCsv(text)
+    if (results.length === 0) {
+      toast.error('O arquivo não contém dados para importar.')
       return
     }
-    setFileName(file.name)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const text = e.target?.result as string
-      const results = parseImportCsv(text)
-      if (results.length === 0) {
-        toast.error('O arquivo não contém dados para importar.')
-        return
-      }
-      setParseResults(results)
-      setActiveTab('preview')
+    setParseResults(results)
+    setActiveTab('preview')
+  }
+
+  function processFile(file: File) {
+    const isXlsx = file.name.endsWith('.xlsx')
+    const isCsv = file.name.endsWith('.csv')
+
+    if (!isCsv && !isXlsx) {
+      toast.error('Apenas arquivos .csv ou .xlsx são aceitos.')
+      return
     }
-    reader.readAsText(file, 'UTF-8')
+
+    setFileName(file.name)
+
+    if (isXlsx) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const buffer = e.target?.result as ArrayBuffer
+        const csvText = xlsxToCsvText(buffer)
+        handleParsedCsv(csvText)
+      }
+      reader.readAsArrayBuffer(file)
+    } else {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const text = e.target?.result as string
+        handleParsedCsv(text)
+      }
+      reader.readAsText(file, 'UTF-8')
+    }
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -144,9 +175,10 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Importar Leads via CSV</DialogTitle>
+          <DialogTitle>Importar Leads via CSV / Excel</DialogTitle>
           <DialogDescription>
-            Importe leads em massa com o estágio definido diretamente no CSV.
+            Importe leads em massa com o estágio definido diretamente no arquivo.
+            Dados como telefone, CPF, datas e status serão normalizados automaticamente.
             Os documentos deverão ser adicionados individualmente em cada lead.
           </DialogDescription>
         </DialogHeader>
@@ -171,11 +203,11 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
             <div className="flex flex-col items-center justify-center min-h-full gap-6 py-8 px-2">
               <div className="text-center space-y-2">
                 <FileText className="h-12 w-12 text-muted-foreground mx-auto" />
-                <h3 className="text-lg font-semibold">Baixe o template CSV</h3>
+                <h3 className="text-lg font-semibold">Baixe o template</h3>
                 <p className="text-sm text-muted-foreground max-w-md">
-                  Use o template abaixo para preencher os dados dos leads.
-                  Não altere os cabeçalhos das colunas. Valores inválidos serão
-                  sinalizados antes da importação.
+                  Use o template abaixo (CSV ou Excel) para preencher os dados dos leads.
+                  Não altere os cabeçalhos das colunas. Dados como telefone, CPF, datas e
+                  status serão normalizados automaticamente antes da validação.
                 </p>
               </div>
 
@@ -220,6 +252,10 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
                   <Download className="mr-2 h-4 w-4" />
                   Baixar template.csv
                 </Button>
+                <Button onClick={handleDownloadExcelTemplate} variant="outline">
+                  <Download className="mr-2 h-4 w-4" />
+                  Baixar template.xlsx
+                </Button>
                 <Button onClick={() => setActiveTab('upload')}>
                   Já tenho o arquivo →
                 </Button>
@@ -246,14 +282,14 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
                   {fileName ? (
                     <span className="text-primary">{fileName}</span>
                   ) : (
-                    <>Arraste o CSV aqui ou <span className="text-primary underline">clique para selecionar</span></>
+                    <>Arraste o arquivo aqui ou <span className="text-primary underline">clique para selecionar</span></>
                   )}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">Somente arquivos .csv — máximo 200 linhas</p>
+                <p className="text-xs text-muted-foreground mt-1">Arquivos .csv ou .xlsx — máximo 200 linhas</p>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.xlsx"
                   className="hidden"
                   onChange={handleFileChange}
                 />
@@ -270,11 +306,11 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
               <div className="flex items-center gap-3">
                 <span className="text-sm text-muted-foreground">{parseResults.length} linha(s) lidas</span>
                 <Badge variant="default" className="gap-1">
-                  <CheckCircle2 className="h-3 w-3" /> {validRows.length} válidas
+                  <CheckCircle2 className="h-3 w-3" /> {validRows.length} válida(s)
                 </Badge>
                 {hasErrors && (
                   <Badge variant="destructive" className="gap-1">
-                    <XCircle className="h-3 w-3" /> {invalidRows.length} com erro
+                    <XCircle className="h-3 w-3" /> {invalidRows.length} erro(s) crítico(s)
                   </Badge>
                 )}
               </div>
@@ -289,63 +325,64 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
                   <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-destructive">
-                      {invalidRows.length} linha(s) com erro não serão importadas.
+                      {invalidRows.length} linha(s) com erro crítico não serão importadas.
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Corrija o arquivo e faça o upload novamente, ou prossiga importando apenas as linhas válidas.
+                      Dados como telefone, CPF, datas e status já foram normalizados automaticamente.
+                      Corrija os erros restantes no arquivo e faça novo upload, ou prossiga importando apenas as linhas válidas.
                     </p>
                   </div>
                 </div>
               </div>
             )}
 
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <ScrollArea className="h-full border rounded-lg">
-                <div className="p-2 space-y-1">
-                  {[...parseResults].sort((a, b) => {
-                    if (!a.success && b.success) return -1
-                    if (a.success && !b.success) return 1
-                    return a.rowIndex - b.rowIndex
-                  }).map((row) => (
-                    <div
-                      key={row.rowIndex}
-                      className={`rounded-md p-3 text-sm ${
-                        row.success ? 'bg-surface-elevated' : 'bg-destructive/5 border border-destructive/20'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {row.success ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-destructive shrink-0" />
-                          )}
-                          <span className="font-medium truncate">
-                            {row.success && row.data ? row.data.nome : `Linha ${row.rowIndex}`}
+            <div className="flex-1 min-h-0 overflow-y-auto border rounded-lg">
+              <div className="p-2 space-y-1">
+                {[...parseResults].sort((a, b) => {
+                  if (!a.success && b.success) return -1
+                  if (a.success && !b.success) return 1
+                  return a.rowIndex - b.rowIndex
+                }).map((row) => (
+                  <div
+                    key={row.rowIndex}
+                    className={`rounded-md p-3 text-sm ${
+                      row.success ? 'bg-surface-elevated' : 'bg-destructive/5 border border-destructive/20'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {row.success ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                        )}
+                        <span className="font-medium truncate">
+                          {row.success && row.data ? row.data.nome : `Linha ${row.rowIndex}`}
+                        </span>
+                        {row.success && row.data && (
+                          <span className="text-muted-foreground text-xs shrink-0">
+                            {row.data.telefone}
+                            {' · '}
+                            <span className="capitalize">{row.data.status}</span>
+                            {row.data.servico_interesse && ` · ${SERVICO_LABELS[row.data.servico_interesse] ?? row.data.servico_interesse}`}
+                            {row.data.valor_bruto != null && ` · R$ ${row.data.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                           </span>
-                          {row.success && row.data && (
-                            <span className="text-muted-foreground text-xs shrink-0">
-                              {row.data.telefone}
-                              {' · '}
-                              <span className="capitalize">{row.data.status}</span>
-                              {row.data.servico_interesse && ` · ${SERVICO_LABELS[row.data.servico_interesse] ?? row.data.servico_interesse}`}
-                              {row.data.valor_bruto != null && ` · R$ ${row.data.valor_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs text-muted-foreground shrink-0">Linha {row.rowIndex}</span>
+                        )}
                       </div>
-                      {!row.success && (
-                        <ul className="mt-2 ml-6 space-y-0.5">
-                          {row.errors.map((err, i) => (
-                            <li key={i} className="text-xs text-destructive">• {err}</li>
-                          ))}
-                        </ul>
-                      )}
+                      <span className="text-xs text-muted-foreground shrink-0">Linha {row.rowIndex}</span>
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
+                    {!row.success && (
+                      <ul className="mt-2 ml-6 space-y-0.5">
+                        {row.errors.map((err, i) => (
+                          <li key={i} className="text-xs text-destructive">
+                            <span className="font-semibold font-mono">{err.field}</span>: {err.message}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-4 shrink-0">
