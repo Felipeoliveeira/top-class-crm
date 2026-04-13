@@ -23,6 +23,7 @@ import {
   type ImportRowResult,
   type ImportLeadsResult,
 } from '@/services/leads'
+import { isTopClassSheet, mapTopClassSheet } from '@/lib/top-class-sheet-mapper'
 import { PIPELINE_QUERY_KEYS } from '@/hooks/usePipeline'
 
 interface ImportarCsvModalProps {
@@ -90,7 +91,8 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
   }
 
   function handleParsedCsv(text: string) {
-    const results = parseImportCsv(text)
+    const csvToProcess = isTopClassSheet(text) ? mapTopClassSheet(text) : text
+    const results = parseImportCsv(csvToProcess)
     if (results.length === 0) {
       toast.error('O arquivo não contém dados para importar.')
       return
@@ -214,10 +216,13 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
               <div className="bg-surface-elevated rounded-lg p-4 w-full max-w-lg space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Obrigatórios para todos os status</p>
                 <div className="flex flex-wrap gap-1">
-                  {['status', 'nome', 'telefone', 'origem', 'necessidade'].map(f => (
+                  {['status', 'nome', 'origem', 'necessidade'].map(f => (
                     <Badge key={f} variant="secondary" className="text-xs font-mono">{f}</Badge>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <span className="font-mono">telefone</span> é opcional; se vazio, o lead importa com aviso no Kanban.
+                </p>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-3">Obrigatórios em negociacao e fechado</p>
                 <div className="flex flex-wrap gap-1">
                   {['email', 'servico_interesse', 'valor_bruto', 'vencimento_dia', 'data_inicio_contrato', 'data_fim_contrato'].map(f => (
@@ -236,7 +241,7 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
                 </div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-3">Sempre opcionais</p>
                 <div className="flex flex-wrap gap-1">
-                  {['cnpj', 'razao_social', 'indicacao_responsavel_nome', 'indicacao_responsavel_telefone'].map(f => (
+                  {['telefone', 'contato_numero', 'cnpj', 'razao_social', 'indicacao_responsavel_nome', 'indicacao_responsavel_telefone'].map(f => (
                     <Badge key={f} variant="outline" className="text-xs font-mono">{f}</Badge>
                   ))}
                 </div>

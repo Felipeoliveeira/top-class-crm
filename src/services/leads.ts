@@ -124,6 +124,7 @@ const IMPORT_CSV_HEADERS = [
   'nome',
   'telefone',
   'email',
+  'contato_numero',
   'cpf',
   'cnpj',
   'razao_social',
@@ -174,6 +175,8 @@ export interface ImportLeadPayload {
   indicacao_responsavel_nome: string | null
   /** Preenchido apenas quando origem = 'indicacao', formato (XX) XXXXX-XXXX */
   indicacao_responsavel_telefone: string | null
+  /** Segundo e-mail / contato adicional (ex.: importação Top Class) */
+  contato_numero: string | null
   necessidade: LeadNecessidade
   servico_interesse: ServicoInteresse | null
   valor_bruto: number | null
@@ -194,6 +197,7 @@ export function buildCsvTemplate(): string {
     'João da Silva',       // nome
     '(79) 99999-9999',    // telefone
     'joao@email.com',     // email
+    '',                    // contato_numero (opcional)
     '123.456.789-09',     // cpf (obrigatório em negociacao; opcional em fechado)
     '',                    // cnpj
     '',                    // razao_social
@@ -215,6 +219,7 @@ export function buildCsvTemplate(): string {
     'Ana Costa',
     '(79) 98765-4321',
     'ana@email.com',
+    '',                    // contato_numero
     '',                    // cpf: pode estar vazio quando status=fechado
     '',
     '',
@@ -236,6 +241,7 @@ export function buildCsvTemplate(): string {
     'Carlos Lima',
     '(79) 91234-5678',
     'carlos@email.com',
+    '',                    // contato_numero
     '',
     '',
     '',
@@ -267,17 +273,17 @@ export function buildExcelTemplate(): Blob {
   const templateData = [
     [...IMPORT_CSV_HEADERS],
     [
-      'negociacao', 'João da Silva', '(79) 99999-9999', 'joao@email.com',
+      'negociacao', 'João da Silva', '(79) 99999-9999', 'joao@email.com', '',
       '123.456.789-09', '', '', 'indicacao', 'Maria Souza', '(79) 98888-7777',
       'escritorio_virtual', 'plano_pro', '850', '10', '2026-05-01', '2027-04-30', 'sim', '',
     ],
     [
-      'fechado', 'Ana Costa', '(79) 98765-4321', 'ana@email.com',
+      'fechado', 'Ana Costa', '(79) 98765-4321', 'ana@email.com', '',
       '', '', '', 'google', '', '',
       'escritorio_virtual', 'plano_premium', '1200', '5', '2025-01-01', '2025-12-31', '', '',
     ],
     [
-      'perdido', 'Carlos Lima', '(79) 91234-5678', 'carlos@email.com',
+      'perdido', 'Carlos Lima', '(79) 91234-5678', 'carlos@email.com', '',
       '', '', '', 'rede_social', '', '',
       'salas', '', '', '', '', '', '', 'preco_alto',
     ],
@@ -292,8 +298,9 @@ export function buildExcelTemplate(): Blob {
     ['Campo', 'Descrição', 'Obrigatório em', 'Valores aceitos / Formato'],
     ['status', 'Estágio do lead no pipeline', 'Todos', 'atendimento, negociacao, fechado, perdido'],
     ['nome', 'Nome completo do lead', 'Todos', 'Texto livre'],
-    ['telefone', 'Telefone fixo ou celular', 'Todos', '(DD) 9XXXX-XXXX ou apenas dígitos (10-11)'],
+    ['telefone', 'Telefone fixo ou celular', 'Opcional (recomendado)', '(DD) 9XXXX-XXXX ou apenas dígitos (10-11); vazio importa com aviso no Kanban'],
     ['email', 'E-mail do lead', 'negociacao, fechado', 'exemplo@dominio.com'],
+    ['contato_numero', 'Contato adicional (ex.: 2º e-mail)', 'Opcional', 'Texto livre'],
     ['cpf', 'CPF (11 dígitos)', 'negociacao', '123.456.789-09 ou apenas dígitos'],
     ['cnpj', 'CNPJ (14 dígitos)', 'Opcional (requer razao_social)', '12.345.678/0001-00 ou apenas dígitos'],
     ['razao_social', 'Razão social (PJ)', 'Quando CNPJ preenchido', 'Texto livre'],
@@ -332,7 +339,7 @@ type ImportStatus = typeof VALID_IMPORT_STATUSES[number]
 /** Faz o parse e validação de um arquivo CSV de importação de leads.
  *
  * Regras de obrigatoriedade por status:
- *  - Todos:        nome, telefone, origem, necessidade
+ *  - Todos:        nome, origem, necessidade (telefone opcional — Kanban mostra aviso se vazio)
  *  - negociacao:   + email, servico_interesse, valor_bruto, vencimento, datas, cpf, possui_nota_fiscal
  *  - fechado:      + email, servico_interesse, valor_bruto, vencimento, datas
  *                  (cpf e possui_nota_fiscal são opcionais — badge visual exibida no Kanban quando ausentes)
@@ -370,6 +377,8 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
     const nome = normalizeNome(row['nome'] ?? '')
     const telefone = normalizeTelefone(row['telefone'] ?? '')
     const email = normalizeEmail(row['email'] ?? '')
+    const contato_numero_raw = (row['contato_numero'] ?? '').trim()
+    const contato_numero = contato_numero_raw ? normalizeEmail(contato_numero_raw) : null
     const cpf = normalizeCpf(row['cpf'] ?? '')
     const cnpj = normalizeCnpj(row['cnpj'] ?? '')
     const razao_social = (row['razao_social'] ?? '').trim()
@@ -402,9 +411,7 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
       errors.push({ field: 'nome', message: 'Nome é obrigatório' })
     }
 
-    if (!telefone) {
-      errors.push({ field: 'telefone', message: 'Telefone é obrigatório' })
-    } else if (!isValidTelefoneImport(telefone)) {
+    if (telefone && !isValidTelefoneImport(telefone)) {
       errors.push({ field: 'telefone', message: `Telefone inválido (${telefone.length} dígitos). Esperado: 10 (fixo) ou 11 (celular)` })
     }
 
@@ -529,6 +536,7 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
         nome,
         telefone,
         email: email || null,
+        contato_numero,
         cpf: cpf || null,
         cnpj: cnpj || null,
         razao_social: razao_social || null,
