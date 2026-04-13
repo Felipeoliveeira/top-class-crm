@@ -58,10 +58,11 @@ import { CSS } from '@dnd-kit/utilities'
 
 /** Retorna true quando um lead importado via CSV está em Fechado com dados obrigatórios ausentes. */
 function hasImportedIncompleteData(lead: Lead): boolean {
+  const semTelefone = !lead.telefone?.trim()
   return (
     lead.importado_csv &&
     lead.status === 'fechado' &&
-    (!lead.cpf || !lead.rg || lead.possui_nota_fiscal === null)
+    (semTelefone || !lead.cpf || !lead.rg || lead.possui_nota_fiscal === null)
   )
 }
 
