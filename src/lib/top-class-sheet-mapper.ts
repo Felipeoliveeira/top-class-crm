@@ -81,6 +81,42 @@ function detectSeparator(line: string): string {
   return commas > semicolons ? ',' : ';'
 }
 
+/**
+ * Faz parse de uma linha CSV respeitando aspas e delimitadores dentro da célula.
+ * Ex.: "a;b";c => ["a;b", "c"].
+ */
+function parseCsvRow(line: string, sep: string): string[] {
+  const cells: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    const next = line[i + 1]
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+      continue
+    }
+
+    if (char === sep && !inQuotes) {
+      cells.push(current.trim())
+      current = ''
+      continue
+    }
+
+    current += char
+  }
+
+  cells.push(current.trim())
+  return cells
+}
+
 // ---------------------------------------------------------------------------
 // Detecção da linha de cabeçalho
 // ---------------------------------------------------------------------------
@@ -108,7 +144,7 @@ export function findHeaderRow(csvText: string): number {
     const line = lines[i].replace(/^\uFEFF/, '')
     if (!line.trim()) continue
     const sep = detectSeparator(line)
-    const headers = line.split(sep).map(normalizeHeader)
+    const headers = parseCsvRow(line, sep).map(normalizeHeader)
     if (TOP_CLASS_HEADERS_NORMALIZED.every(req => headers.includes(req))) {
       return i
     }
@@ -164,6 +200,23 @@ function mapContador(raw: string): { origem: string; indicacaoNome: string } {
   }
 
   return { origem: 'indicacao', indicacaoNome: raw.trim() }
+}
+
+// ---------------------------------------------------------------------------
+// Coluna NF → possui_nota_fiscal (valores livres da planilha interna)
+// ---------------------------------------------------------------------------
+
+/**
+ * Converte rótulos da coluna `NF` da planilha Top Class para valores que
+ * `normalizeNotaFiscal` já reconhece. Demais valores seguem inalterados.
+ */
+function mapTopClassNf(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  const v = removeAccents(trimmed.toLowerCase())
+  if (v === 'emitir') return 'sim'
+  if (v === 'isento' || v === 'isenta') return 'nao'
+  return trimmed
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +331,7 @@ export function mapTopClassSheet(csvText: string): string {
   const rawHeader = allLines[headerIdx].replace(/^\uFEFF/, '')
   const sep = detectSeparator(rawHeader)
 
-  const rawHeaders = rawHeader.split(sep).map(h => h.trim().replace(/^"|"$/g, ''))
+  const rawHeaders = parseCsvRow(rawHeader, sep).map(h => h.trim())
   const normalizedIndex = new Map<string, number>()
   rawHeaders.forEach((h, i) => normalizedIndex.set(normalizeHeader(h), i))
 
@@ -290,9 +343,7 @@ export function mapTopClassSheet(csvText: string): string {
   const outputLines: string[] = [CRM_HEADERS.join(';')]
 
   for (let i = 0; i < dataLines.length; i++) {
-    const cells = dataLines[i]
-      .split(sep)
-      .map(c => c.trim().replace(/^"|"$/g, '').replace(/""/g, '"'))
+    const cells = parseCsvRow(dataLines[i], sep)
 
     const get = (col: string): string => cells[idx(col)] ?? ''
 
@@ -339,13 +390,13 @@ export function mapTopClassSheet(csvText: string): string {
     const dataInicio = smartNormalizeDate(get('Início'))
     const dataFim = smartNormalizeDate(get('Término'))
 
-    // ── Valor e vencimento (vazio → dia 1) ──
+    // ── Valor e vencimento (vazio → 0 = pagamento integral) ──
     const valorBruto = normalizeValor(get('Valor'))
     const vencRaw = normalizeVencimento(get('Venc.'))
-    const vencimento = vencRaw || '1'
+    const vencimento = vencRaw || '0'
 
-    // ── NF (passa bruto — parseImportCsv normaliza) ──
-    const nf = get('NF').trim()
+    // ── NF (emitir → sim; isento/isenta → não; demais → parseImportCsv normaliza) ──
+    const nf = mapTopClassNf(get('NF'))
 
     const { primary: email, contatoAdicional } = parseEmailsFromCell(get('Email'))
 

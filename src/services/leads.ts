@@ -150,6 +150,42 @@ const VALID_SERVICOS: ServicoInteresse[] = [
 
 const MAX_IMPORT_ROWS = 200
 
+/**
+ * Faz parse de uma linha CSV no formato delimitado por `;`, respeitando aspas.
+ * Permite delimitador dentro da célula quando o conteúdo está entre aspas.
+ */
+function parseSemicolonCsvRow(line: string): string[] {
+  const cells: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    const next = line[i + 1]
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+      continue
+    }
+
+    if (char === ';' && !inQuotes) {
+      cells.push(current.trim())
+      current = ''
+      continue
+    }
+
+    current += char
+  }
+
+  cells.push(current.trim())
+  return cells
+}
+
 export interface ImportRowError {
   field: string
   message: string
@@ -310,7 +346,7 @@ export function buildExcelTemplate(): Blob {
     ['necessidade', 'Necessidade do lead', 'Todos', 'escritorio_virtual, salas, endereco_fiscal, coworking'],
     ['servico_interesse', 'Serviço contratado / de interesse', 'negociacao, fechado', 'plano_pro, plano_premium, plano_top, coworking, sala_special_room, mini_sala_reuniao, sala_reuniao_8, sala_reuniao_12, salas_fixas'],
     ['valor_bruto', 'Valor mensal (R$)', 'negociacao, fechado', 'Número: 850 ou 1.200,50 ou R$ 850'],
-    ['vencimento_dia', 'Dia de vencimento (1–31)', 'negociacao, fechado', 'Número: 1 a 31'],
+    ['vencimento_dia', 'Dia de vencimento (0–31)', 'negociacao, fechado', 'Número: 0 a 31 (0 = pagamento integral)'],
     ['data_inicio_contrato', 'Início do contrato', 'negociacao, fechado', 'DD/MM/YYYY, DD-MM-YYYY ou YYYY-MM-DD'],
     ['data_fim_contrato', 'Fim do contrato', 'negociacao, fechado', 'DD/MM/YYYY, DD-MM-YYYY ou YYYY-MM-DD'],
     ['possui_nota_fiscal', 'Emite nota fiscal?', 'negociacao', 'sim/s/1/true/yes ou nao/n/0/false/no'],
@@ -350,7 +386,7 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
   const lines = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim())
   if (lines.length < 2) return []
 
-  const header = lines[0].split(';').map(h => h.trim().replace(/^\uFEFF/, ''))
+  const header = parseSemicolonCsvRow(lines[0]).map(h => h.replace(/^\uFEFF/, ''))
   const dataLines = lines.slice(1)
 
   const results: ImportRowResult[] = []
@@ -365,7 +401,7 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
 
   for (let i = 0; i < dataLines.length; i++) {
     const rowIndex = i + 2
-    const cells = dataLines[i].split(';').map(c => c.trim().replace(/^"|"$/g, '').replace(/""/g, '"'))
+    const cells = parseSemicolonCsvRow(dataLines[i])
     const row: Record<string, string> = {}
     for (let j = 0; j < header.length; j++) {
       row[header[j]] = cells[j] ?? ''
@@ -473,8 +509,8 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
       const vencimento_parsed = parseInt(vencimento_str, 10)
       if (!vencimento_str) {
         errors.push({ field: 'vencimento_dia', message: 'Vencimento (dia) é obrigatório' })
-      } else if (isNaN(vencimento_parsed) || vencimento_parsed < 1 || vencimento_parsed > 31) {
-        errors.push({ field: 'vencimento_dia', message: 'Vencimento deve ser entre 1 e 31' })
+      } else if (isNaN(vencimento_parsed) || vencimento_parsed < 0 || vencimento_parsed > 31) {
+        errors.push({ field: 'vencimento_dia', message: 'Vencimento deve ser entre 0 e 31 (0 = pagamento integral)' })
       }
 
       if (!data_inicio_raw) {
