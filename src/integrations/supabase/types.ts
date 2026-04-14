@@ -369,6 +369,11 @@ export type Database = {
         | "plano_premium"
         | "plano_top"
         | "coworking"
+        | "coworking_hora"
+        | "coworking_turno"
+        | "coworking_diaria"
+        | "coworking_mensal_4h"
+        | "coworking_mensal_8h"
         | "sala_special_room"
         | "mini_sala_reuniao"
         | "sala_reuniao_8"
@@ -530,6 +535,11 @@ export const Constants = {
         "plano_premium",
         "plano_top",
         "coworking",
+        "coworking_hora",
+        "coworking_turno",
+        "coworking_diaria",
+        "coworking_mensal_4h",
+        "coworking_mensal_8h",
         "sala_special_room",
         "mini_sala_reuniao",
         "sala_reuniao_8",

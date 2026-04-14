@@ -144,8 +144,19 @@ const IMPORT_CSV_HEADERS = [
 const VALID_ORIGENS: LeadOrigem[] = ['indicacao', 'google', 'placa', 'rede_social', 'outros']
 const VALID_NECESSIDADES: LeadNecessidade[] = ['escritorio_virtual', 'salas', 'endereco_fiscal', 'coworking']
 const VALID_SERVICOS: ServicoInteresse[] = [
-  'plano_pro', 'plano_premium', 'plano_top', 'coworking',
-  'sala_special_room', 'mini_sala_reuniao', 'sala_reuniao_8', 'sala_reuniao_12', 'salas_fixas',
+  'plano_pro',
+  'plano_premium',
+  'plano_top',
+  'coworking_hora',
+  'coworking_turno',
+  'coworking_diaria',
+  'coworking_mensal_4h',
+  'coworking_mensal_8h',
+  'sala_special_room',
+  'mini_sala_reuniao',
+  'sala_reuniao_8',
+  'sala_reuniao_12',
+  'salas_fixas',
 ]
 
 const MAX_IMPORT_ROWS = 200
@@ -344,7 +355,7 @@ export function buildExcelTemplate(): Blob {
     ['indicacao_responsavel_nome', 'Nome de quem indicou', 'Opcional (origem=indicacao)', 'Texto livre'],
     ['indicacao_responsavel_telefone', 'Telefone de quem indicou', 'Opcional (origem=indicacao)', '(DD) 9XXXX-XXXX'],
     ['necessidade', 'Necessidade do lead', 'Todos', 'escritorio_virtual, salas, endereco_fiscal, coworking'],
-    ['servico_interesse', 'Serviço contratado / de interesse', 'negociacao, fechado', 'plano_pro, plano_premium, plano_top, coworking, sala_special_room, mini_sala_reuniao, sala_reuniao_8, sala_reuniao_12, salas_fixas'],
+    ['servico_interesse', 'Serviço contratado / de interesse', 'negociacao, fechado', 'plano_pro, plano_premium, plano_top, coworking_hora, coworking_turno, coworking_diaria, coworking_mensal_4h, coworking_mensal_8h, sala_special_room, mini_sala_reuniao, sala_reuniao_8, sala_reuniao_12, salas_fixas'],
     ['valor_bruto', 'Valor mensal (R$)', 'negociacao, fechado', 'Número: 850 ou 1.200,50 ou R$ 850'],
     ['vencimento_dia', 'Dia de vencimento (0–31)', 'negociacao, fechado', 'Número: 0 a 31 (0 = pagamento integral)'],
     ['data_inicio_contrato', 'Início do contrato', 'negociacao, fechado', 'DD/MM/YYYY, DD-MM-YYYY ou YYYY-MM-DD'],

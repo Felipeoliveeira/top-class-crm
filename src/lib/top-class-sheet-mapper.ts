@@ -166,6 +166,13 @@ export function isTopClassSheet(csvText: string): boolean {
 // ---------------------------------------------------------------------------
 
 const SERVICOS_ESCRITORIO = new Set(['plano_pro', 'plano_premium', 'plano_top'])
+const SERVICOS_COWORKING = new Set([
+  'coworking_hora',
+  'coworking_turno',
+  'coworking_diaria',
+  'coworking_mensal_4h',
+  'coworking_mensal_8h',
+])
 const SERVICOS_SALAS = new Set([
   'sala_special_room',
   'mini_sala_reuniao',
@@ -176,7 +183,7 @@ const SERVICOS_SALAS = new Set([
 
 function inferNecessidade(servicoNormalizado: string): string {
   if (SERVICOS_ESCRITORIO.has(servicoNormalizado)) return 'escritorio_virtual'
-  if (servicoNormalizado === 'coworking') return 'coworking'
+  if (SERVICOS_COWORKING.has(servicoNormalizado)) return 'coworking'
   if (SERVICOS_SALAS.has(servicoNormalizado)) return 'salas'
   // Fallback: escritorio_virtual para serviços não reconhecidos
   return 'escritorio_virtual'

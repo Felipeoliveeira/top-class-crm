@@ -92,12 +92,18 @@ Esta é a transição mais exigente do pipeline. Todos os gates abaixo devem ser
 | `'plano_pro'` | Plano Pro |
 | `'plano_premium'` | Plano Premium |
 | `'plano_top'` | Plano Top |
-| `'coworking'` | Coworking |
+| `'coworking_hora'` | Coworking - Hora |
+| `'coworking_turno'` | Coworking - Turno |
+| `'coworking_diaria'` | Coworking - Diária |
+| `'coworking_mensal_4h'` | Coworking Mensal - 4 Horas |
+| `'coworking_mensal_8h'` | Coworking Mensal - 8 Horas |
 | `'sala_special_room'` | Sala Special Room (até 3 pessoas) |
 | `'mini_sala_reuniao'` | Mini Sala de Reunião (até 5 pessoas) |
 | `'sala_reuniao_8'` | Sala de Reunião (até 8 pessoas) |
 | `'sala_reuniao_12'` | Sala de Reunião (até 12 pessoas) |
 | `'salas_fixas'` | Salas Fixas |
+
+_Obs.: o tipo PostgreSQL `servico_enum` ainda inclui o valor legado `'coworking'` (sem uso na UI); novos cadastros usam apenas os cinco planos Coworking listados acima._
 
 #### Desconto e valor líquido
 
@@ -313,7 +319,7 @@ Esta é a transição mais exigente do pipeline. Todos os gates abaixo devem ser
 | Aspecto | Definição |
 |---------|-----------|
 | **Tipo** | Gráfico de barras horizontais |
-| **Categorias** | Plano Pro, Plano Premium, Plano Top, Coworking, Sala Special Room, Mini Sala Reunião, Sala Reunião até 8, Sala Reunião até 12, Salas Fixas |
+| **Categorias** | Plano Pro, Plano Premium, Plano Top, Coworking - Hora, Coworking - Turno, Coworking - Diária, Coworking Mensal - 4 Horas, Coworking Mensal - 8 Horas, Sala Special Room, Mini Sala Reunião, Sala Reunião até 8, Sala Reunião até 12, Salas Fixas |
 | **Filtro de status** | **Nenhum** — considera **todos** os leads que possuem `servico_interesse` preenchido, independente do status |
 | **Observação** | Leads em Atendimento (sem `servico_interesse`) não aparecem neste gráfico |
 | **Filtro temporal** | Aplica o filtro de período selecionado |
