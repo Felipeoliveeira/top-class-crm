@@ -170,10 +170,23 @@ const SERVICO_ALIASES: Record<string, string> = {
   'virtual_top': 'plano_top',
   'escritorio_virtual_top': 'plano_top',
 
-  // Coworking
-  'coworking': 'coworking',
-  'co_working': 'coworking',
-  'co-working': 'coworking',
+  // Coworking (slugs canônicos + rótulos normalizados por normalizeEnumField)
+  'coworking_hora': 'coworking_hora',
+  'coworking_turno': 'coworking_turno',
+  'coworking_diaria': 'coworking_diaria',
+  'coworking_mensal_4h': 'coworking_mensal_4h',
+  'coworking_mensal_8h': 'coworking_mensal_8h',
+  'coworking_-_hora': 'coworking_hora',
+  'coworking_-_turno': 'coworking_turno',
+  'coworking_-_diaria': 'coworking_diaria',
+  'coworking_mensal_-_4_horas': 'coworking_mensal_4h',
+  'coworking_mensal_-_8_horas': 'coworking_mensal_8h',
+  'coworking_mensal_4_horas': 'coworking_mensal_4h',
+  'coworking_mensal_8_horas': 'coworking_mensal_8h',
+  // Genérico / legado → diária (valor neutro quando o CSV não discrimina o plano)
+  'coworking': 'coworking_diaria',
+  'co_working': 'coworking_diaria',
+  'co-working': 'coworking_diaria',
 
   // Sala Special Room
   'sala_special_room': 'sala_special_room',

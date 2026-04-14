@@ -25,6 +25,7 @@ import {
 } from '@/services/leads'
 import { isTopClassSheet, mapTopClassSheet } from '@/lib/top-class-sheet-mapper'
 import { PIPELINE_QUERY_KEYS } from '@/hooks/usePipeline'
+import { SERVICO_LABELS } from '@/types'
 
 interface ImportarCsvModalProps {
   open: boolean
@@ -39,18 +40,6 @@ const ORIGEM_LABELS: Record<string, string> = {
   placa: 'Placa',
   rede_social: 'Rede Social',
   outros: 'Outros',
-}
-
-const SERVICO_LABELS: Record<string, string> = {
-  plano_pro: 'Plano Pro',
-  plano_premium: 'Plano Premium',
-  plano_top: 'Plano Top',
-  coworking: 'Coworking',
-  sala_special_room: 'Sala Special Room',
-  mini_sala_reuniao: 'Mini Sala de Reunião',
-  sala_reuniao_8: 'Sala de Reunião até 8',
-  sala_reuniao_12: 'Sala de Reunião até 12',
-  salas_fixas: 'Salas Fixas',
 }
 
 export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) {

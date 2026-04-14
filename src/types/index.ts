@@ -2,7 +2,20 @@ export type Role = 'admin' | 'consultor'
 export type LeadStatus = 'atendimento' | 'negociacao' | 'fechado' | 'perdido' | 'inativo'
 export type LeadOrigem = 'indicacao' | 'google' | 'placa' | 'rede_social' | 'outros'
 export type LeadNecessidade = 'escritorio_virtual' | 'salas' | 'endereco_fiscal' | 'coworking'
-export type ServicoInteresse = 'plano_pro' | 'plano_premium' | 'plano_top' | 'coworking' | 'sala_special_room' | 'mini_sala_reuniao' | 'sala_reuniao_8' | 'sala_reuniao_12' | 'salas_fixas'
+export type ServicoInteresse =
+  | 'plano_pro'
+  | 'plano_premium'
+  | 'plano_top'
+  | 'coworking_hora'
+  | 'coworking_turno'
+  | 'coworking_diaria'
+  | 'coworking_mensal_4h'
+  | 'coworking_mensal_8h'
+  | 'sala_special_room'
+  | 'mini_sala_reuniao'
+  | 'sala_reuniao_8'
+  | 'sala_reuniao_12'
+  | 'salas_fixas'
 export type StatusFinanceiro = 'pago' | 'pendente'
 export type MotivoPerdaTipo = 'parou_responder' | 'sem_interesse' | 'preco' | 'concorrencia' | 'outro'
 
@@ -106,7 +119,11 @@ export const SERVICO_LABELS: Record<ServicoInteresse, string> = {
   plano_pro: 'Plano Pro',
   plano_premium: 'Plano Premium',
   plano_top: 'Plano Top',
-  coworking: 'Coworking',
+  coworking_hora: 'Coworking - Hora',
+  coworking_turno: 'Coworking - Turno',
+  coworking_diaria: 'Coworking - Diária',
+  coworking_mensal_4h: 'Coworking Mensal - 4 Horas',
+  coworking_mensal_8h: 'Coworking Mensal - 8 Horas',
   sala_special_room: 'Sala Special Room',
   mini_sala_reuniao: 'Mini Sala de Reunião',
   sala_reuniao_8: 'Sala de Reunião até 8',
