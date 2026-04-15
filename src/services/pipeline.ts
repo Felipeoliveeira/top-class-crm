@@ -174,16 +174,43 @@ export function calculateValorLiquido(
   return Math.round(valorBruto * (1 - porcentagemDesconto / 100) * 100) / 100
 }
 
+export interface LeadsCreatedAtRangeFilter {
+  from: string | null
+  to: string | null
+}
+
+function toRangeDayBounds(filter?: LeadsCreatedAtRangeFilter): LeadsCreatedAtRangeFilter {
+  if (!filter?.from && !filter?.to) {
+    return { from: null, to: null }
+  }
+
+  const fromDate = filter?.from ? new Date(filter.from) : null
+  const toDate = filter?.to ? new Date(filter.to) : null
+
+  if (fromDate) fromDate.setHours(0, 0, 0, 0)
+  if (toDate) toDate.setHours(23, 59, 59, 999)
+
+  return {
+    from: fromDate ? fromDate.toISOString() : null,
+    to: toDate ? toDate.toISOString() : null,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Funções de dados (Supabase queries)
 // ---------------------------------------------------------------------------
 
-export async function fetchLeadsByStatus(): Promise<Lead[]> {
-  const { data, error } = await supabase
+export async function fetchLeadsByStatus(filter?: LeadsCreatedAtRangeFilter): Promise<Lead[]> {
+  let query = supabase
     .from('leads')
     .select('*')
     .order('created_at', { ascending: false })
 
+  const { from, to } = toRangeDayBounds(filter)
+  if (from) query = query.gte('created_at', from)
+  if (to) query = query.lte('created_at', to)
+
+  const { data, error } = await query
   if (error) throw new Error(error.message)
   return (data as Lead[]) ?? []
 }

@@ -1,13 +1,15 @@
 import { useMemo, useEffect, useState } from 'react'
+import type { DateRange } from 'react-day-picker'
 import { PageHeader } from '@/components/PageHeader'
 import { KpiCard } from '@/components/KpiCard'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useDashboardCharts, useDashboardKpis, useConsultoresPerformanceTable } from '@/hooks/useDashboard'
 import { computeConsultorPerformance } from '@/services/dashboard'
-import type { TimeFilter } from '@/services/dashboard'
+import type { DashboardFilterInput, TimeFilter } from '@/services/dashboard'
 import { Users, TrendingUp, CheckCircle, DollarSign, XCircle, TrendingDown, Percent, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts'
 import { toast } from 'sonner'
 
@@ -27,8 +29,21 @@ const origemColors: Record<string, string> = {
 }
 
 export default function DashboardPage() {
-  const { canViewAllDashboard, canViewFinancialKpis, canViewPerformanceTable } = usePermissions()
-  const [filter, setFilter] = useState<TimeFilter>('30dias')
+  const { canViewFinancialKpis, canViewPerformanceTable } = usePermissions()
+  const [presetFilter, setPresetFilter] = useState<TimeFilter>('30dias')
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined)
+  const [isCustomFilterActive, setIsCustomFilterActive] = useState(false)
+
+  const filter = useMemo<DashboardFilterInput>(() => {
+    if (isCustomFilterActive && customRange?.from && customRange?.to) {
+      return {
+        type: 'custom',
+        from: customRange.from.toISOString(),
+        to: customRange.to.toISOString(),
+      }
+    }
+    return presetFilter
+  }, [customRange?.from, customRange?.to, isCustomFilterActive, presetFilter])
 
   const { kpis, isLoading: loadingKpis, isError, error } = useDashboardKpis(filter)
   const { charts, leads } = useDashboardCharts(filter)
@@ -64,17 +79,34 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader title="Dashboard" subtitle={canViewPerformanceTable ? 'Visão geral do time comercial' : 'Visão geral do funil'} />
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {(Object.keys(filterLabels) as TimeFilter[]).map(f => (
           <button
             key={f}
             type="button"
-            onClick={() => setFilter(f)}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${f === filter ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-surface-elevated'}`}
+            onClick={() => {
+              setPresetFilter(f)
+              setIsCustomFilterActive(false)
+            }}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${!isCustomFilterActive && f === presetFilter ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-surface-elevated'}`}
           >
             {filterLabels[f]}
           </button>
         ))}
+        <DateRangePicker
+          value={customRange}
+          onChange={range => {
+            setCustomRange(range)
+            setIsCustomFilterActive(Boolean(range?.from && range?.to))
+          }}
+          placeholder="Personalizado"
+          fixedLabel
+          buttonClassName={
+            isCustomFilterActive
+              ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
+              : 'border-transparent bg-card text-muted-foreground hover:bg-surface-elevated hover:text-foreground'
+          }
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

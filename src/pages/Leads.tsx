@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import type { DateRange } from 'react-day-picker'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
 import { usePipelineLeads, useActiveConsultores, useInactivateLead } from '@/hooks/usePipeline'
@@ -27,7 +29,6 @@ export default function LeadsPage() {
   const [importModalOpen, setImportModalOpen] = useState(false)
   const navigate = useNavigate()
 
-  const { data: allLeads = [], isLoading: loading } = usePipelineLeads()
   const { data: consultores = [] } = useActiveConsultores()
   const inactivateMutation = useInactivateLead()
   const exportLogMutation = useLogExportacao()
@@ -35,9 +36,19 @@ export default function LeadsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all')
   const [origemFilter, setOrigemFilter] = useState<LeadOrigem | 'all'>('all')
+  const [createdAtRange, setCreatedAtRange] = useState<DateRange | undefined>(undefined)
   const [page, setPage] = useState(1)
   const perPage = 25
 
+  const createdAtFilter = useMemo(
+    () =>
+      createdAtRange?.from && createdAtRange?.to
+        ? { from: createdAtRange.from.toISOString(), to: createdAtRange.to.toISOString() }
+        : undefined,
+    [createdAtRange?.from, createdAtRange?.to],
+  )
+
+  const { data: allLeads = [], isLoading: loading } = usePipelineLeads(createdAtFilter)
   const consultorNames = useMemo(() => {
     const map: Record<string, string> = {}
     for (const consultor of consultores) {
@@ -84,6 +95,7 @@ export default function LeadsPage() {
     setSearch('')
     setStatusFilter('all')
     setOrigemFilter('all')
+    setCreatedAtRange(undefined)
     setPage(1)
   }
 
@@ -104,8 +116,8 @@ export default function LeadsPage() {
         status: statusFilter,
         origem: origemFilter,
         consultorId: 'all',
-        periodoDe: null,
-        periodoAte: null,
+        periodoDe: createdAtRange?.from ? createdAtRange.from.toISOString() : null,
+        periodoAte: createdAtRange?.to ? createdAtRange.to.toISOString() : null,
       }
 
       await exportLogMutation.mutateAsync({
@@ -216,6 +228,16 @@ export default function LeadsPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <DateRangePicker
+          value={createdAtRange}
+          onChange={range => {
+            setCreatedAtRange(range)
+            setPage(1)
+          }}
+          placeholder="Data"
+          buttonClassName="w-full sm:w-56 border-border bg-card text-foreground hover:bg-surface-elevated"
+        />
 
         <Button type="button" variant="ghost" className="text-muted-foreground" onClick={resetFilters}>
           Limpar
