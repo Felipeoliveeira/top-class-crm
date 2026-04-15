@@ -53,6 +53,12 @@ export function normalizeValor(raw: string): string {
     return v
   }
 
+  // Detecta formato US: 1,200.50 (vírgula como milhar, ponto como decimal)
+  if (/^\d{1,3}(,\d{3})*(\.\d+)?$/.test(v)) {
+    v = v.replace(/,/g, '')
+    return v
+  }
+
   // Formato com vírgula decimal sem pontos de milhar: 1200,50
   if (/^\d+(,\d+)$/.test(v)) {
     v = v.replace(',', '.')
@@ -154,9 +160,13 @@ export function normalizeEnumField(raw: string): string {
 const SERVICO_ALIASES: Record<string, string> = {
   // Plano Pro
   'pro': 'plano_pro',
+  'basico': 'plano_pro',
   'plano_pro': 'plano_pro',
   'virtual_pro': 'plano_pro',
   'escritorio_virtual_pro': 'plano_pro',
+  // Planilha interna Top Class: "PLANO PRO - COWORKING"
+  'plano_pro_coworking': 'coworking_mensal_4h',
+  'plano_pro_-_coworking': 'coworking_mensal_4h',
 
   // Plano Premium
   'premium': 'plano_premium',

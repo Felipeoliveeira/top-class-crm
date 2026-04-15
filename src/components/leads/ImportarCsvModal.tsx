@@ -239,6 +239,10 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
                   <span className="font-mono">atendimento</span>, <span className="font-mono">negociacao</span>,{' '}
                   <span className="font-mono">fechado</span>, <span className="font-mono">perdido</span>
                 </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Em <span className="font-mono">contato_numero</span>, se houver mais de um contato adicional
+                  (ex.: 2º e-mail e/ou 2º telefone), separe com <span className="font-mono">/</span>.
+                </p>
               </div>
 
               <div className="flex gap-3 flex-wrap justify-center">
