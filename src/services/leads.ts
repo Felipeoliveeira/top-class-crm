@@ -425,7 +425,7 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
     const telefone = normalizeTelefone(row['telefone'] ?? '')
     const email = normalizeEmail(row['email'] ?? '')
     const contato_numero_raw = (row['contato_numero'] ?? '').trim()
-    const contato_numero = contato_numero_raw ? normalizeEmail(contato_numero_raw) : null
+    const contato_numero = contato_numero_raw || null
     const cpf = normalizeCpf(row['cpf'] ?? '')
     const cnpj = normalizeCnpj(row['cnpj'] ?? '')
     const razao_social = (row['razao_social'] ?? '').trim()

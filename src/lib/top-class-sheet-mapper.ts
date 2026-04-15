@@ -308,6 +308,25 @@ function parseEmailsFromCell(raw: string): { primary: string; contatoAdicional: 
   return { primary: parts[0], contatoAdicional: parts[1] }
 }
 
+/**
+ * Primeiro telefone para o campo principal; segundo para Contato Adicional (`contato_numero`).
+ * Separadores: `/` ou `;`.
+ */
+function parsePhonesFromCell(raw: string): { primary: string; contatoAdicional: string } {
+  const trimmed = raw.trim()
+  if (!trimmed) {
+    return { primary: '', contatoAdicional: '' }
+  }
+  const parts = trimmed.split(/[/;]/).map(p => p.trim()).filter(Boolean)
+  if (parts.length === 0) {
+    return { primary: '', contatoAdicional: '' }
+  }
+  if (parts.length === 1) {
+    return { primary: parts[0], contatoAdicional: '' }
+  }
+  return { primary: parts[0], contatoAdicional: parts[1] }
+}
+
 // ---------------------------------------------------------------------------
 // Utilitário de escape de célula CSV
 // ---------------------------------------------------------------------------
@@ -405,12 +424,14 @@ export function mapTopClassSheet(csvText: string): string {
     // ── NF (emitir → sim; isento/isenta → não; demais → parseImportCsv normaliza) ──
     const nf = mapTopClassNf(get('NF'))
 
-    const { primary: email, contatoAdicional } = parseEmailsFromCell(get('Email'))
+    const { primary: email, contatoAdicional: emailAdicional } = parseEmailsFromCell(get('Email'))
+    const { primary: telefone, contatoAdicional: telefoneAdicional } = parsePhonesFromCell(get('Contato'))
+    const contatoAdicional = [emailAdicional, telefoneAdicional].filter(Boolean).join(' / ')
 
     const row: string[] = [
       'fechado',          // status — fixo para esta planilha
       escapeCsvCell(nome),
-      get('Contato').trim(),
+      telefone,
       email,
       escapeCsvCell(contatoAdicional),
       cpf,
