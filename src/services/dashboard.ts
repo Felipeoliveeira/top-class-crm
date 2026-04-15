@@ -3,6 +3,28 @@ import { LEAD_ORIGEM_LABELS, LEAD_ORIGEM_ORDER, SERVICO_LABELS } from '@/types'
 import type { Lead, Perfil } from '@/types'
 
 export type TimeFilter = 'hoje' | '7dias' | '30dias' | 'total'
+export interface CustomDateRangeFilter {
+  type: 'custom'
+  from: string
+  to: string
+}
+export interface PresetDateFilter {
+  type: 'preset'
+  preset: TimeFilter
+}
+export type DashboardDateFilter = PresetDateFilter | CustomDateRangeFilter
+export type DashboardFilterInput = TimeFilter | DashboardDateFilter
+
+export function isCustomDateRangeFilter(filter: DashboardFilterInput): filter is CustomDateRangeFilter {
+  return typeof filter === 'object' && filter.type === 'custom'
+}
+
+export function toDashboardDateFilter(filter: DashboardFilterInput): DashboardDateFilter {
+  if (typeof filter === 'string') {
+    return { type: 'preset', preset: filter }
+  }
+  return filter
+}
 
 /** Limite inferior (inclusivo) de `created_at` para o filtro; `null` = sem filtro (Total). */
 export function getCreatedAtLowerBoundIso(filter: TimeFilter): string | null {
@@ -23,10 +45,39 @@ export function getCreatedAtLowerBoundIso(filter: TimeFilter): string | null {
   return null
 }
 
-export async function fetchDashboardLeads(filter: TimeFilter): Promise<Lead[]> {
+export interface CreatedAtBounds {
+  lower: string | null
+  upper: string | null
+}
+
+function toDayBoundsIso(fromIso: string, toIso: string): { lower: string; upper: string } {
+  const lowerDate = new Date(fromIso)
+  lowerDate.setHours(0, 0, 0, 0)
+
+  const upperDate = new Date(toIso)
+  upperDate.setHours(23, 59, 59, 999)
+
+  if (lowerDate.getTime() <= upperDate.getTime()) {
+    return { lower: lowerDate.toISOString(), upper: upperDate.toISOString() }
+  }
+
+  return { lower: upperDate.toISOString(), upper: lowerDate.toISOString() }
+}
+
+export function getCreatedAtBoundsIso(filter: DashboardFilterInput): CreatedAtBounds {
+  const normalized = toDashboardDateFilter(filter)
+  if (normalized.type === 'preset') {
+    return { lower: getCreatedAtLowerBoundIso(normalized.preset), upper: null }
+  }
+  // Range customizado sempre inclui o dia inicial e o dia final completos.
+  return toDayBoundsIso(normalized.from, normalized.to)
+}
+
+export async function fetchDashboardLeads(filter: DashboardFilterInput): Promise<Lead[]> {
   let query = supabase.from('leads').select('*')
-  const lower = getCreatedAtLowerBoundIso(filter)
+  const { lower, upper } = getCreatedAtBoundsIso(filter)
   if (lower) query = query.gte('created_at', lower)
+  if (upper) query = query.lte('created_at', upper)
   const { data, error } = await query
   if (error) throw new Error(error.message)
   return (data as Lead[]) || []

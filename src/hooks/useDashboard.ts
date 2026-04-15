@@ -4,7 +4,8 @@ import type { QueryClient } from '@tanstack/react-query'
 import {
   fetchDashboardLeads,
   fetchConsultoresAtivos,
-  type TimeFilter,
+  type DashboardFilterInput,
+  toDashboardDateFilter,
   computeDashboardKpis,
   computeDailySeries,
   computeLeadsPorOrigem,
@@ -15,13 +16,19 @@ import {
 
 export const DASHBOARD_QUERY_KEYS = {
   root: ['dashboard'] as const,
-  leads: (filter: TimeFilter) => ['dashboard', 'leads', filter] as const,
+  leads: (filter: DashboardFilterInput) => {
+    const normalized = toDashboardDateFilter(filter)
+    if (normalized.type === 'preset') {
+      return ['dashboard', 'leads', 'preset', normalized.preset] as const
+    }
+    return ['dashboard', 'leads', 'custom', normalized.from, normalized.to] as const
+  },
   consultores: ['dashboard', 'consultores'] as const,
 }
 
 const STALE_MS = 30_000
 
-export function useDashboardLeads(filter: TimeFilter) {
+export function useDashboardLeads(filter: DashboardFilterInput) {
   return useQuery({
     queryKey: DASHBOARD_QUERY_KEYS.leads(filter),
     queryFn: () => fetchDashboardLeads(filter),
@@ -29,13 +36,13 @@ export function useDashboardLeads(filter: TimeFilter) {
   })
 }
 
-export function useDashboardKpis(filter: TimeFilter) {
+export function useDashboardKpis(filter: DashboardFilterInput) {
   const { data: leads = [], ...query } = useDashboardLeads(filter)
   const kpis = useMemo(() => computeDashboardKpis(leads), [leads])
   return { kpis, leads, ...query }
 }
 
-export function useDashboardCharts(filter: TimeFilter) {
+export function useDashboardCharts(filter: DashboardFilterInput) {
   const { data: leads = [], ...query } = useDashboardLeads(filter)
   const charts = useMemo(
     () => ({

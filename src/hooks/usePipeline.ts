@@ -9,6 +9,7 @@ import {
   inactivateLead,
   type CreateLeadInput,
   type MarkAsLostInput,
+  type LeadsCreatedAtRangeFilter,
 } from '@/services/pipeline'
 import { invalidateDashboardQueries } from '@/hooks/useDashboard'
 import type { Lead, LeadStatus } from '@/types'
@@ -18,7 +19,8 @@ import type { Lead, LeadStatus } from '@/types'
 // ---------------------------------------------------------------------------
 
 export const PIPELINE_QUERY_KEYS = {
-  leads: ['pipeline', 'leads'] as const,
+  leads: (filter?: LeadsCreatedAtRangeFilter) =>
+    ['pipeline', 'leads', filter?.from ?? null, filter?.to ?? null] as const,
   consultores: ['pipeline', 'consultores'] as const,
   perfisNames: ['pipeline', 'perfisNames'] as const,
 }
@@ -27,10 +29,10 @@ export const PIPELINE_QUERY_KEYS = {
 // Queries
 // ---------------------------------------------------------------------------
 
-export function usePipelineLeads() {
+export function usePipelineLeads(filter?: LeadsCreatedAtRangeFilter) {
   return useQuery({
-    queryKey: PIPELINE_QUERY_KEYS.leads,
-    queryFn: fetchLeadsByStatus,
+    queryKey: PIPELINE_QUERY_KEYS.leads(filter),
+    queryFn: () => fetchLeadsByStatus(filter),
   })
 }
 
@@ -59,7 +61,7 @@ export function useCreateLead() {
   return useMutation({
     mutationFn: (input: CreateLeadInput) => createLead(input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
+      queryClient.invalidateQueries({ queryKey: ['pipeline', 'leads'] })
       invalidateDashboardQueries(queryClient)
     },
   })
@@ -71,7 +73,7 @@ export function useAdvanceStage() {
     mutationFn: ({ lead, targetStatus }: { lead: Lead; targetStatus: LeadStatus }) =>
       advanceStage(lead, targetStatus),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
+      queryClient.invalidateQueries({ queryKey: ['pipeline', 'leads'] })
       invalidateDashboardQueries(queryClient)
     },
   })
@@ -83,7 +85,7 @@ export function useMarkAsLost() {
     mutationFn: ({ lead, ...input }: { lead: Lead } & MarkAsLostInput) =>
       markAsLost(lead, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
+      queryClient.invalidateQueries({ queryKey: ['pipeline', 'leads'] })
       invalidateDashboardQueries(queryClient)
     },
   })
@@ -94,7 +96,7 @@ export function useInactivateLead() {
   return useMutation({
     mutationFn: (lead: Lead) => inactivateLead(lead),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
+      queryClient.invalidateQueries({ queryKey: ['pipeline', 'leads'] })
       invalidateDashboardQueries(queryClient)
     },
   })
