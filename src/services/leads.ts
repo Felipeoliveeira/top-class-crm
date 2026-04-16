@@ -26,6 +26,7 @@ export interface LeadsListFiltersSnapshot {
   search: string
   status: LeadStatus | 'all'
   origem: LeadOrigem | 'all'
+  necessidade: LeadNecessidade | 'all'
   consultorId: string | 'all'
   periodoDe: string | null
   periodoAte: string | null
@@ -380,7 +381,7 @@ export function xlsxToCsvText(arrayBuffer: ArrayBuffer): string {
   return XLSX.utils.sheet_to_csv(ws, { FS: ';' })
 }
 
-const VALID_IMPORT_STATUSES = ['atendimento', 'negociacao', 'fechado', 'perdido'] as const
+const VALID_IMPORT_STATUSES = ['atendimento', 'negociacao', 'fechado', 'perdido', 'inativo'] as const
 type ImportStatus = typeof VALID_IMPORT_STATUSES[number]
 
 /** Faz o parse e validação de um arquivo CSV de importação de leads.
@@ -390,6 +391,7 @@ type ImportStatus = typeof VALID_IMPORT_STATUSES[number]
  *  - negociacao:   + email, servico_interesse, valor_bruto, vencimento, datas, cpf, possui_nota_fiscal
  *  - fechado:      + email, servico_interesse, valor_bruto, vencimento, datas
  *                  (cpf e possui_nota_fiscal são opcionais — badge visual exibida no Kanban quando ausentes)
+ *  - inativo:      mesmas exigências de fechado (cliente já contratado / encerrado no CRM)
  *  - perdido:      + motivo_perda
  *  - atendimento:  somente os campos base
  */
@@ -495,8 +497,9 @@ export function parseImportCsv(csvText: string): ImportRowResult[] {
       errors.push({ field: 'razao_social', message: 'Razão Social é obrigatória quando CNPJ está preenchido' })
     }
 
-    // ── Campos obrigatórios para negociacao e fechado ──
-    const requiresContractFields = status === 'negociacao' || status === 'fechado'
+    // ── Campos obrigatórios para negociacao, fechado e inativo ──
+    const requiresContractFields =
+      status === 'negociacao' || status === 'fechado' || status === 'inativo'
     if (requiresContractFields) {
       if (!email) {
         errors.push({ field: 'email', message: 'E-mail é obrigatório' })
@@ -622,10 +625,10 @@ export async function importLeads(
 
   for (const row of validRows) {
     const { motivo_perda, status, ...rest } = row.data!
-    // Leads fechados importados têm sua data de cadastro definida como a data de início
-    // do contrato, pois o fechamento já ocorreu antes da importação no sistema.
+    // Leads fechados ou inativos importados têm data de cadastro = início do contrato
+    // (relacionamento já existia antes da importação no sistema).
     const createdAtOverride =
-      status === 'fechado' && rest.data_inicio_contrato
+      (status === 'fechado' || status === 'inativo') && rest.data_inicio_contrato
         ? { created_at: `${rest.data_inicio_contrato}T12:00:00.000Z` }
         : {}
 

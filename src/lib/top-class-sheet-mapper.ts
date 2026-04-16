@@ -14,6 +14,7 @@ import { digitsOnly } from '@/lib/br-inputs'
 const TOP_CLASS_REQUIRED_HEADERS = [
   'Nome/Razão Social',
   'CNPJ/CPF',
+  'Situação',
   'Responsável',
   'Contato',
   'Email',
@@ -226,6 +227,18 @@ function mapTopClassNf(raw: string): string {
   return trimmed
 }
 
+/**
+ * Coluna Situação da planilha interna → status do CSV de importação do CRM.
+ * Vazio ou valor diferente de ATIVO/INATIVO gera token rejeitado por `parseImportCsv`.
+ */
+function mapSituacaoToCrmStatus(raw: string): string {
+  const v = removeAccents(raw.trim().toLowerCase())
+  if (!v) return '__situacao_obrigatoria__'
+  if (v === 'ativo') return 'fechado'
+  if (v === 'inativo') return 'inativo'
+  return '__situacao_invalida__'
+}
+
 // ---------------------------------------------------------------------------
 // Conversão de datas seriais do Excel → YYYY-MM-DD
 // ---------------------------------------------------------------------------
@@ -429,7 +442,7 @@ export function mapTopClassSheet(csvText: string): string {
     const contatoAdicional = [emailAdicional, telefoneAdicional].filter(Boolean).join(' / ')
 
     const row: string[] = [
-      'fechado',          // status — fixo para esta planilha
+      mapSituacaoToCrmStatus(get('Situação')),
       escapeCsvCell(nome),
       telefone,
       email,
@@ -447,7 +460,7 @@ export function mapTopClassSheet(csvText: string): string {
       dataInicio,
       dataFim,
       nf,
-      '',                 // motivo_perda — não se aplica (status = fechado)
+      '',                 // motivo_perda — não se aplica (fechado / inativo)
     ]
 
     outputLines.push(row.join(';'))

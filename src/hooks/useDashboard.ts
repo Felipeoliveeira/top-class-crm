@@ -13,10 +13,12 @@ import {
   computeLeadsPorServico,
   computeClientesPorServico,
 } from '@/services/dashboard'
+import type { DashboardFilterInput as DashboardFilterInputType } from '@/services/dashboard'
+import type { ServicoInteresse } from '@/types'
 
 export const DASHBOARD_QUERY_KEYS = {
   root: ['dashboard'] as const,
-  leads: (filter: DashboardFilterInput) => {
+  leads: (filter: DashboardFilterInputType) => {
     const normalized = toDashboardDateFilter(filter)
     if (normalized.type === 'preset') {
       return ['dashboard', 'leads', 'preset', normalized.preset] as const
@@ -28,7 +30,7 @@ export const DASHBOARD_QUERY_KEYS = {
 
 const STALE_MS = 30_000
 
-export function useDashboardLeads(filter: DashboardFilterInput) {
+export function useDashboardLeads(filter: DashboardFilterInputType) {
   return useQuery({
     queryKey: DASHBOARD_QUERY_KEYS.leads(filter),
     queryFn: () => fetchDashboardLeads(filter),
@@ -36,25 +38,39 @@ export function useDashboardLeads(filter: DashboardFilterInput) {
   })
 }
 
-export function useDashboardKpis(filter: DashboardFilterInput) {
+export function useDashboardKpis(
+  filter: DashboardFilterInputType,
+  planFilter: ServicoInteresse | 'all' = 'all',
+) {
   const { data: leads = [], ...query } = useDashboardLeads(filter)
-  const kpis = useMemo(() => computeDashboardKpis(leads), [leads])
-  return { kpis, leads, ...query }
+  const filteredLeads = useMemo(
+    () => (planFilter === 'all' ? leads : leads.filter(l => l.servico_interesse === planFilter)),
+    [leads, planFilter],
+  )
+  const kpis = useMemo(() => computeDashboardKpis(filteredLeads), [filteredLeads])
+  return { kpis, leads: filteredLeads, ...query }
 }
 
-export function useDashboardCharts(filter: DashboardFilterInput) {
+export function useDashboardCharts(
+  filter: DashboardFilterInputType,
+  planFilter: ServicoInteresse | 'all' = 'all',
+) {
   const { data: leads = [], ...query } = useDashboardLeads(filter)
+  const filteredLeads = useMemo(
+    () => (planFilter === 'all' ? leads : leads.filter(l => l.servico_interesse === planFilter)),
+    [leads, planFilter],
+  )
   const charts = useMemo(
     () => ({
-      daily: computeDailySeries(leads),
-      origem: computeLeadsPorOrigem(leads),
-      clientesOrigem: computeClientesPorOrigem(leads),
-      servico: computeLeadsPorServico(leads),
-      clientesServico: computeClientesPorServico(leads),
+      daily: computeDailySeries(filteredLeads),
+      origem: computeLeadsPorOrigem(filteredLeads),
+      clientesOrigem: computeClientesPorOrigem(filteredLeads),
+      servico: computeLeadsPorServico(filteredLeads),
+      clientesServico: computeClientesPorServico(filteredLeads),
     }),
-    [leads],
+    [filteredLeads],
   )
-  return { charts, leads, ...query }
+  return { charts, leads: filteredLeads, ...query }
 }
 
 export function useConsultoresPerformanceTable(enabled: boolean) {
