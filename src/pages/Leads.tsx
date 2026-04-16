@@ -5,7 +5,6 @@ import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -18,10 +17,12 @@ import {
   LEAD_NECESSIDADE_LABELS,
   type LeadStatus,
   type LeadOrigem,
+  type LeadNecessidade,
 } from '@/types'
 import { Pencil, UserX, Download, Upload, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ImportarCsvModal } from '@/components/leads/ImportarCsvModal'
+import { LeadsTableColumnFilter } from '@/components/leads/LeadsTableColumnFilter'
 
 export default function LeadsPage() {
   const { user } = useAuth()
@@ -36,6 +37,7 @@ export default function LeadsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all')
   const [origemFilter, setOrigemFilter] = useState<LeadOrigem | 'all'>('all')
+  const [necessidadeFilter, setNecessidadeFilter] = useState<LeadNecessidade | 'all'>('all')
   const [createdAtRange, setCreatedAtRange] = useState<DateRange | undefined>(undefined)
   const [page, setPage] = useState(1)
   const perPage = 25
@@ -81,9 +83,12 @@ export default function LeadsPage() {
 
     if (statusFilter !== 'all') data = data.filter(lead => lead.status === statusFilter)
     if (origemFilter !== 'all') data = data.filter(lead => lead.origem === origemFilter)
+    if (necessidadeFilter !== 'all') {
+      data = data.filter(lead => lead.necessidade === necessidadeFilter)
+    }
 
     return data
-  }, [allLeads, search, statusFilter, origemFilter])
+  }, [allLeads, search, statusFilter, origemFilter, necessidadeFilter])
 
   const totalPages = Math.max(1, Math.ceil(filteredLeads.length / perPage))
   const safePage = Math.min(page, totalPages)
@@ -95,6 +100,7 @@ export default function LeadsPage() {
     setSearch('')
     setStatusFilter('all')
     setOrigemFilter('all')
+    setNecessidadeFilter('all')
     setCreatedAtRange(undefined)
     setPage(1)
   }
@@ -115,6 +121,7 @@ export default function LeadsPage() {
         search,
         status: statusFilter,
         origem: origemFilter,
+        necessidade: necessidadeFilter,
         consultorId: 'all',
         periodoDe: createdAtRange?.from ? createdAtRange.from.toISOString() : null,
         periodoAte: createdAtRange?.to ? createdAtRange.to.toISOString() : null,
@@ -185,50 +192,6 @@ export default function LeadsPage() {
           />
         </div>
 
-        <Select
-          value={statusFilter}
-          onValueChange={value => {
-            setStatusFilter(value as LeadStatus | 'all')
-            setPage(1)
-          }}
-        >
-          <SelectTrigger className="w-full sm:w-40 bg-card border-border text-foreground">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent className="bg-card border-border">
-            <SelectItem value="all" className="text-foreground focus:bg-surface-elevated">
-              Todos
-            </SelectItem>
-            {Object.entries(LEAD_STATUS_LABELS).map(([key, label]) => (
-              <SelectItem key={key} value={key} className="text-foreground focus:bg-surface-elevated">
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={origemFilter}
-          onValueChange={value => {
-            setOrigemFilter(value as LeadOrigem | 'all')
-            setPage(1)
-          }}
-        >
-          <SelectTrigger className="w-full sm:w-40 bg-card border-border text-foreground">
-            <SelectValue placeholder="Origem" />
-          </SelectTrigger>
-          <SelectContent className="bg-card border-border">
-            <SelectItem value="all" className="text-foreground focus:bg-surface-elevated">
-              Todas
-            </SelectItem>
-            {Object.entries(LEAD_ORIGEM_LABELS).map(([key, label]) => (
-              <SelectItem key={key} value={key} className="text-foreground focus:bg-surface-elevated">
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
         <DateRangePicker
           value={createdAtRange}
           onChange={range => {
@@ -250,15 +213,42 @@ export default function LeadsPage() {
             <tr className="bg-card">
               <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase">Nome</th>
               <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase">Telefone</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase">Origem</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase">Necessidade</th>
+              <LeadsTableColumnFilter
+                title="Origem"
+                allOptionLabel="Todas"
+                value={origemFilter}
+                optionEntries={Object.entries(LEAD_ORIGEM_LABELS)}
+                onValueChange={value => {
+                  setOrigemFilter(value as LeadOrigem | 'all')
+                  setPage(1)
+                }}
+              />
+              <LeadsTableColumnFilter
+                title="Necessidade"
+                allOptionLabel="Todas"
+                value={necessidadeFilter}
+                optionEntries={Object.entries(LEAD_NECESSIDADE_LABELS)}
+                onValueChange={value => {
+                  setNecessidadeFilter(value as LeadNecessidade | 'all')
+                  setPage(1)
+                }}
+              />
               {canViewAllLeads && (
                 <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase">
                   Consultor
                 </th>
               )}
               <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase">Data</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase">Status</th>
+              <LeadsTableColumnFilter
+                title="Status"
+                allOptionLabel="Todos"
+                value={statusFilter}
+                optionEntries={Object.entries(LEAD_STATUS_LABELS)}
+                onValueChange={value => {
+                  setStatusFilter(value as LeadStatus | 'all')
+                  setPage(1)
+                }}
+              />
               <th className="text-right py-3 px-4 text-xs font-medium text-muted-foreground uppercase">Ações</th>
             </tr>
           </thead>

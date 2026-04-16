@@ -10,6 +10,8 @@ import { Users, TrendingUp, CheckCircle, DollarSign, XCircle, TrendingDown, Perc
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SERVICO_LABELS, type ServicoInteresse } from '@/types'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts'
 import { toast } from 'sonner'
 
@@ -33,6 +35,7 @@ export default function DashboardPage() {
   const [presetFilter, setPresetFilter] = useState<TimeFilter>('30dias')
   const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined)
   const [isCustomFilterActive, setIsCustomFilterActive] = useState(false)
+  const [planFilter, setPlanFilter] = useState<ServicoInteresse | 'all'>('all')
 
   const filter = useMemo<DashboardFilterInput>(() => {
     if (isCustomFilterActive && customRange?.from && customRange?.to) {
@@ -45,8 +48,8 @@ export default function DashboardPage() {
     return presetFilter
   }, [customRange?.from, customRange?.to, isCustomFilterActive, presetFilter])
 
-  const { kpis, isLoading: loadingKpis, isError, error } = useDashboardKpis(filter)
-  const { charts, leads } = useDashboardCharts(filter)
+  const { kpis, isLoading: loadingKpis, isError, error } = useDashboardKpis(filter, planFilter)
+  const { charts, leads } = useDashboardCharts(filter, planFilter)
 
   const { data: consultores = [], isLoading: loadingConsultores } = useConsultoresPerformanceTable(
     canViewPerformanceTable,
@@ -107,6 +110,24 @@ export default function DashboardPage() {
               : 'border-transparent bg-card text-muted-foreground hover:bg-surface-elevated hover:text-foreground'
           }
         />
+        <Select
+          value={planFilter}
+          onValueChange={value => setPlanFilter(value as ServicoInteresse | 'all')}
+        >
+          <SelectTrigger className="w-full sm:w-56 bg-card border-transparent text-muted-foreground hover:bg-surface-elevated hover:text-foreground">
+            <SelectValue placeholder="Todos os Planos" />
+          </SelectTrigger>
+          <SelectContent className="bg-card border-border">
+            <SelectItem value="all" className="text-foreground focus:bg-surface-elevated">
+              Todos os Planos
+            </SelectItem>
+            {Object.entries(SERVICO_LABELS).map(([key, label]) => (
+              <SelectItem key={key} value={key} className="text-foreground focus:bg-surface-elevated">
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
