@@ -388,7 +388,7 @@ export default function LeadDetailPage() {
         return false
       }
       const venc = lead.data_prevista_pagamento
-      if (venc == null || venc < 1 || venc > 31) missing.push('Vencimento')
+      if (venc == null || venc < 0 || venc > 31) missing.push('Vencimento')
       if (!lead.data_inicio_contrato?.trim()) missing.push('Data início do contrato')
       if (!lead.data_fim_contrato?.trim()) missing.push('Data fim do contrato')
       if (
@@ -836,7 +836,20 @@ export default function LeadDetailPage() {
             </div>
             <div className="space-y-2 max-w-xs">
               <Label className="text-foreground">Vencimento</Label>
-              <Input type="number" min={1} max={31} required placeholder="Dia do mês (1–31)" value={lead.data_prevista_pagamento ?? ''} onChange={e => updateField('data_prevista_pagamento', Number(e.target.value) || null)} className="bg-background border-border" />
+              <Input
+                type="number"
+                min={0}
+                max={31}
+                required
+                placeholder="Dia do mês (0–31; 0 = pagamento integral)"
+                value={lead.data_prevista_pagamento ?? ''}
+                onChange={e => {
+                  const raw = e.target.value
+                  if (raw === '') updateField('data_prevista_pagamento', null)
+                  else updateField('data_prevista_pagamento', Number(raw))
+                }}
+                className="bg-background border-border"
+              />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
