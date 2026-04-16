@@ -128,7 +128,7 @@ export async function validateNegociacaoToFechado(lead: Lead): Promise<string[]>
   if (lead.status_financeiro !== 'pago') missing.push('Status Financeiro = Pago')
 
   const venc = lead.data_prevista_pagamento
-  if (venc == null || venc < 1 || venc > 31) missing.push('Vencimento')
+  if (venc == null || venc < 0 || venc > 31) missing.push('Vencimento')
 
   if (!lead.data_inicio_contrato?.trim()) missing.push('Data início do contrato')
   if (!lead.data_fim_contrato?.trim()) missing.push('Data fim do contrato')
