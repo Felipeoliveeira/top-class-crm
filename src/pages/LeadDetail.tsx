@@ -24,7 +24,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
-import { PIPELINE_QUERY_KEYS } from '@/hooks/usePipeline'
 import { invalidateDashboardQueries } from '@/hooks/useDashboard'
 import { usePermissions } from '@/hooks/usePermissions'
 import { supabase } from '@/integrations/supabase/client'
@@ -118,8 +117,7 @@ export default function LeadDetailPage() {
   const queryClient = useQueryClient()
 
   const invalidateLeadsQueries = () => {
-    queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
-    queryClient.invalidateQueries({ queryKey: ['leads'] })
+    queryClient.invalidateQueries({ queryKey: ['pipeline', 'leads'] })
     invalidateDashboardQueries(queryClient)
   }
 
@@ -327,34 +325,33 @@ export default function LeadDetailPage() {
     }
 
     setSaving(true)
-    let persistedDocsCount = 0
     try {
-      persistedDocsCount = await persistUploadedFiles()
-      if (persistedDocsCount < 0) {
-        setSaving(false)
+      let persistedDocsCount = 0
+      try {
+        persistedDocsCount = await persistUploadedFiles()
+        if (persistedDocsCount < 0) return
+      } catch (err) {
+        toast.error(`Erro ao enviar documentos: ${(err as Error).message}`)
         return
       }
-    } catch (err) {
-      setSaving(false)
-      toast.error(`Erro ao enviar documentos: ${(err as Error).message}`)
-      return
-    }
 
-    const { error } = await supabase.from('leads').update({
-      ...buildLeadPersistFields(),
-      status: lead.status,
-    }).eq('id', lead.id)
+      const { error } = await supabase.from('leads').update({
+        ...buildLeadPersistFields(),
+        status: lead.status,
+      }).eq('id', lead.id)
 
-    setSaving(false)
-    if (error) {
-      toast.error('Erro ao salvar: ' + error.message)
-    } else {
-      invalidateLeadsQueries()
-      if (persistedDocsCount > 0) {
-        toast.success(`Lead salvo com sucesso! ${persistedDocsCount} documento(s) enviado(s).`)
+      if (error) {
+        toast.error('Erro ao salvar: ' + error.message)
       } else {
-        toast.success('Lead salvo com sucesso!')
+        invalidateLeadsQueries()
+        if (persistedDocsCount > 0) {
+          toast.success(`Lead salvo com sucesso! ${persistedDocsCount} documento(s) enviado(s).`)
+        } else {
+          toast.success('Lead salvo com sucesso!')
+        }
       }
+    } finally {
+      setSaving(false)
     }
   }
 

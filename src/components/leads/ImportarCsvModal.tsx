@@ -24,7 +24,6 @@ import {
   type ImportLeadsResult,
 } from '@/services/leads'
 import { isTopClassSheet, mapTopClassSheet } from '@/lib/top-class-sheet-mapper'
-import { PIPELINE_QUERY_KEYS } from '@/hooks/usePipeline'
 import { SERVICO_LABELS } from '@/types'
 
 interface ImportarCsvModalProps {
@@ -139,7 +138,7 @@ export function ImportarCsvModal({ open, onOpenChange }: ImportarCsvModalProps) 
       const result = await importLeads(parseResults, user.id, user.id)
       setImportResult(result)
       setActiveTab('resultado')
-      queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.leads })
+      queryClient.invalidateQueries({ queryKey: ['pipeline', 'leads'] })
       if (result.totalSucesso > 0) {
         toast.success(`${result.totalSucesso} lead(s) importado(s) com sucesso!`)
       }
