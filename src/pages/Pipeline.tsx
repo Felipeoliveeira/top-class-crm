@@ -15,12 +15,13 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useAuth } from '@/hooks/useAuth'
 import { usePermissions } from '@/hooks/usePermissions'
 import {
-  usePipelineLeads,
+  useColumnLeads,
   useActiveConsultores,
   useAllPerfisNames,
   useCreateLead,
   useAdvanceStage,
   useMarkAsLost,
+  type ColumnLeadsState,
 } from '@/hooks/usePipeline'
 import {
   isTransitionAllowed,
@@ -183,8 +184,39 @@ export default function PipelinePage() {
   const navigate = useNavigate()
   const { canAssignConsultor } = usePermissions()
 
-  // Dados via TanStack Query (S-3.1.2)
-  const { data: leads = [], isLoading } = usePipelineLeads()
+  // Chave de reset: incrementar força todos os hooks de coluna a recarregar do início
+  const [paginationReset, setPaginationReset] = useState(0)
+  const resetAllColumns = useCallback(() => setPaginationReset(k => k + 1), [])
+
+  // Uma instância de paginação por coluna (hooks não podem ser chamados em loops)
+  const atendimentoCol = useColumnLeads('atendimento', undefined, paginationReset)
+  const negociacaoCol  = useColumnLeads('negociacao',  undefined, paginationReset)
+  const fechadoCol     = useColumnLeads('fechado',     undefined, paginationReset)
+  const perdidoCol     = useColumnLeads('perdido',     undefined, paginationReset)
+
+  const columnMap: Record<LeadStatus, ColumnLeadsState> = {
+    atendimento: atendimentoCol,
+    negociacao:  negociacaoCol,
+    fechado:     fechadoCol,
+    perdido:     perdidoCol,
+    // 'inativo' não aparece no kanban — valor vazio para satisfazer o tipo
+    inativo: { leads: [], total: 0, hasMore: false, isLoading: false, isLoadingMore: false, loadMore: async () => {} },
+  }
+
+  // Array unificado usado pelo DnD para localizar leads pelo id
+  const allLeads = [
+    ...atendimentoCol.leads,
+    ...negociacaoCol.leads,
+    ...fechadoCol.leads,
+    ...perdidoCol.leads,
+  ]
+
+  const isLoading =
+    atendimentoCol.isLoading ||
+    negociacaoCol.isLoading  ||
+    fechadoCol.isLoading     ||
+    perdidoCol.isLoading
+
   const { data: consultores = [] } = useActiveConsultores()
   const { data: perfisNames = {} } = useAllPerfisNames()
   const createLeadMutation = useCreateLead()
@@ -232,6 +264,7 @@ export default function PipelinePage() {
       setNewLeadOpen(false)
       setNome(''); setTelefone(''); setConsultorId('')
       toast.success('Lead criado com sucesso!')
+      resetAllColumns()
     } catch (err) {
       toast.error(`Erro ao criar lead: ${(err as Error).message}`)
     }
@@ -261,19 +294,17 @@ export default function PipelinePage() {
       targetStatus = overId.replace('column-', '') as LeadStatus
     } else if (overId.startsWith('lead-')) {
       const targetLeadId = Number(overId.replace('lead-', ''))
-      const targetLead = leads.find(l => l.id === targetLeadId)
+      const targetLead = allLeads.find(l => l.id === targetLeadId)
       targetStatus = targetLead?.status || null
     }
 
     if (!targetStatus || targetStatus === lead.status) return
 
-    // Valida transição via regras centralizadas (S-3.3.7)
     if (!isTransitionAllowed(lead.status, targetStatus)) {
       toast.error('Esta movimentação não é permitida.')
       return
     }
 
-    // Perdido → abre modal de motivo (S-3.3.5)
     if (targetStatus === 'perdido') {
       setLossLead(lead)
       setLossMotivo('')
@@ -282,10 +313,10 @@ export default function PipelinePage() {
       return
     }
 
-    // Avança etapa via serviço centralizado (valida gates + atualiza)
     try {
       await advanceStageMutation.mutateAsync({ lead, targetStatus })
       toast.success(`Lead movido para ${LEAD_STATUS_LABELS[targetStatus]}`)
+      resetAllColumns()
     } catch (err) {
       if (err instanceof GateValidationError) {
         toast.error(`Preencha os campos obrigatórios no detalhe do lead para avançar: ${err.missingFields.join(', ')}`)
@@ -295,7 +326,7 @@ export default function PipelinePage() {
         toast.error(`Erro ao mover lead: ${(err as Error).message}`)
       }
     }
-  }, [leads, advanceStageMutation])
+  }, [allLeads, advanceStageMutation, resetAllColumns])
 
   // --- Confirmar perda com validação de origem (S-3.3.5) ---
   const handleConfirmLoss = async () => {
@@ -317,6 +348,7 @@ export default function PipelinePage() {
       setLossModalOpen(false)
       setLossLead(null)
       toast.success(`Lead movido para ${LEAD_STATUS_LABELS.perdido}`)
+      resetAllColumns()
     } catch (err) {
       toast.error(`Erro ao atualizar lead: ${(err as Error).message}`)
       setLossModalOpen(false)
@@ -341,6 +373,7 @@ export default function PipelinePage() {
     try {
       await advanceStageMutation.mutateAsync({ lead, targetStatus: newStatus })
       toast.success(`Lead movido para ${LEAD_STATUS_LABELS[newStatus]}`)
+      resetAllColumns()
     } catch (err) {
       if (err instanceof GateValidationError) {
         toast.error(`Preencha os campos obrigatórios: ${err.missingFields.join(', ')}`)
@@ -376,17 +409,19 @@ export default function PipelinePage() {
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex gap-4 overflow-x-auto pb-4">
             {statusColumns.map(({ status, color }) => {
-              const columnLeads = leads.filter(l => l.status === status)
+              const colData = columnMap[status]
               return (
-                <div key={status} className="flex-1 min-w-[280px]">
+                <div key={status} className="flex-1 min-w-[280px] flex flex-col">
                   <div className="flex items-center justify-between mb-3 px-1">
                     <h3 className={cn('text-sm font-bold uppercase tracking-wider', headerColors[status])}>
                       {LEAD_STATUS_LABELS[status]}
                     </h3>
-                    <span className="rounded-full bg-card px-2.5 py-0.5 text-xs font-medium text-muted-foreground">{columnLeads.length}</span>
+                    <span className="rounded-full bg-card px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                      {colData.total}
+                    </span>
                   </div>
                   <DroppableColumn status={status}>
-                    {columnLeads.map(lead => (
+                    {colData.leads.map(lead => (
                       <DraggableLeadCard
                         key={lead.id}
                         lead={lead}
@@ -396,6 +431,18 @@ export default function PipelinePage() {
                       />
                     ))}
                   </DroppableColumn>
+                  {colData.hasMore && (
+                    <button
+                      onClick={() => colData.loadMore()}
+                      disabled={colData.isLoadingMore}
+                      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md py-2 text-xs text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {colData.isLoadingMore
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : null}
+                      Carregar mais
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -425,7 +472,7 @@ export default function PipelinePage() {
           ))}
         </div>
         <div className="space-y-3">
-          {leads.filter(l => l.status === mobileFilter).map(lead => (
+          {columnMap[mobileFilter].leads.map(lead => (
             <div key={lead.id} className="rounded-lg bg-card border border-border p-4 space-y-2">
               <div className="flex items-center justify-between" onClick={() => navigate(`/leads/${lead.id}`)} role="button">
                 <p className="font-semibold text-foreground">{lead.nome}</p>
@@ -452,6 +499,18 @@ export default function PipelinePage() {
               </div>
             </div>
           ))}
+          {columnMap[mobileFilter].hasMore && (
+            <button
+              onClick={() => columnMap[mobileFilter].loadMore()}
+              disabled={columnMap[mobileFilter].isLoadingMore}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-3 text-xs text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground disabled:opacity-60"
+            >
+              {columnMap[mobileFilter].isLoadingMore
+                ? <Loader2 className="h-3 w-3 animate-spin" />
+                : null}
+              Carregar mais
+            </button>
+          )}
         </div>
       </div>
 

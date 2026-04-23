@@ -200,6 +200,31 @@ function toRangeDayBounds(filter?: LeadsCreatedAtRangeFilter): LeadsCreatedAtRan
 // Funções de dados (Supabase queries)
 // ---------------------------------------------------------------------------
 
+export const PAGE_SIZE = 10
+
+export async function fetchLeadsByStatusPaginated(
+  status: LeadStatus,
+  offset: number,
+  limit: number,
+  filter?: LeadsCreatedAtRangeFilter,
+): Promise<{ data: Lead[]; count: number }> {
+  let query = supabase
+    .from('leads')
+    .select('*', { count: 'exact' })
+    .eq('status', status)
+    .order('created_at', { ascending: false })
+
+  const { from, to } = toRangeDayBounds(filter)
+  if (from) query = query.gte('created_at', from)
+  if (to) query = query.lte('created_at', to)
+
+  query = query.range(offset, offset + limit - 1)
+
+  const { data, error, count } = await query
+  if (error) throw new Error(error.message)
+  return { data: (data as Lead[]) ?? [], count: count ?? 0 }
+}
+
 export async function fetchLeadsByStatus(filter?: LeadsCreatedAtRangeFilter): Promise<Lead[]> {
   let query = supabase
     .from('leads')
