@@ -1,0 +1,162 @@
+---
+alwaysApply: true
+---
+
+REGRAS DO PROJETO — CRM Top Class
+Nosso Guia: Este documento estabelece os padrões de qualidade, arquitetura e estratégia para o desenvolvimento do CRM Top Class. É a referência para manter consistência, segurança e performance, trabalhando em harmonia com o Cursor e o Lovable.
+Você é um expert em TypeScript, React, Vite, Supabase, Shadcn UI, Radix UI e Tailwind CSS.
+
+1. Contexto do Projeto
+O CRM Top Class é um sistema interno de gestão de leads e pipeline comercial para o escritório virtual Top Class (Aracaju/SE). O sistema gerencia o ciclo completo de um lead desde o primeiro contato até o fechamento ou perda, com controle de acesso por perfil de usuário.
+Stack definido:
+
+Frontend: Lovable (React + Vite + Shadcn UI + Tailwind CSS)
+Backend/DB: Supabase (PostgreSQL + Auth + Storage + RLS)
+IDE: Cursor
+
+
+2. Organização & Arquitetura do Projeto
+
+Use estrutura de diretórios agrupada por domínio de negócio:
+
+src/features/auth/ — login, sessão, controle de acesso
+src/features/leads/ — criação, edição, visualização de leads
+src/features/pipeline/ — Kanban, movimentação de estágios, gates de campo
+src/features/dashboard/ — métricas, relatórios, indicadores
+src/features/contratos/ — upload, visualização, gestão de contratos (Supabase Storage)
+src/features/consultores/ — gestão de usuários do perfil Consultor (Admin only)
+src/features/historico/ — linha do tempo imutável de interações por lead
+
+
+Use src/lib/ para lógica de baixo nível: instância do cliente Supabase, helpers de formatação e utilitários.
+Migrations e Edge Functions do Supabase ficam em supabase/ na raiz.
+Componentes globais reutilizáveis ficam em src/components/.
+
+
+3. Regras de Negócio — Pipeline Kanban
+O pipeline possui 4 estágios fixos e sequenciais. Nenhum estágio pode ser pulado.
+Atendimento → Negociação → Fechado → Perdido
+Gates obrigatórios por estágio (campos que devem estar preenchidos antes de avançar):
+DeParaCampos obrigatóriosAtendimentoNegociaçãoNome completo, telefone, serviço de interesseNegociaçãoFechadoProposta enviada, valor acordado, forma de pagamentoQualquerPerdidoMotivo da perda (campo obrigatório)
+
+Nunca permita movimentação de estágio sem validar os gates no frontend E no backend (Edge Function ou RLS policy).
+O histórico de cada movimentação deve ser registrado na tabela lead_interactions de forma imutável (apenas INSERT, nunca UPDATE/DELETE nessa tabela).
+
+
+4. Controle de Acesso — Roles
+Existem exatamente dois perfis de usuário:
+RolePermissõesadminAcesso total: todos os leads, todos os consultores, relatórios, configuraçõesconsultorAcesso restrito: vê e edita apenas os próprios leads
+
+Toda regra de isolamento de dados deve ser implementada via RLS no Supabase, usando auth.uid() para identificar o dono do lead.
+O role do usuário deve ser armazenado na tabela profiles (coluna role) e nunca no JWT diretamente sem validação server-side.
+No frontend, use o role para controlar visibilidade de rotas e componentes, mas nunca confie apenas no frontend para proteger dados sensíveis.
+
+
+5. Integração Supabase
+
+Separe as configurações do cliente Supabase por ambiente em src/lib/supabase/client.ts.
+Nunca acesse o Supabase diretamente em componentes React para lógica complexa ou sensível — use Edge Functions.
+RLS deve estar ativo em todas as tabelas desde o primeiro dia, sem exceção.
+Chaves secretas ficam em variáveis de ambiente (.env / .env.local). Nunca suba .env para o repositório.
+A chave anon do Supabase é usada apenas no client-side para consultas públicas e seguras.
+A chave service_role é usada exclusivamente em Edge Functions.
+
+Tabelas principais:
+leads              — dados do lead, estágio atual, consultor_id (FK)
+lead_interactions  — histórico imutável (INSERT only via policy)
+profiles           — dados do usuário + role (admin | consultor)
+contratos          — metadados dos contratos (Storage URL, lead_id)
+
+6. Estilo e Estrutura do Código
+
+Escreva TypeScript conciso e técnico, com exemplos claros.
+Use comentários para explicar lógica de negócio complexa (especialmente gates de pipeline).
+Prefira padrões funcionais e declarativos em React.
+Evite duplicação de código — use funções auxiliares e componentes modulares.
+Nomes de variáveis descritivos com verbos auxiliares: isLoading, hasError, canAdvanceStage.
+Estrutura de arquivo de componente: componente principal → subcomponentes → helpers → estáticos → tipos.
+
+
+7. Convenções de Nomenclatura
+
+Diretórios: letras minúsculas com hífens (src/features/lead-detail).
+Componentes React e funções: named exports.
+Props e modelos de dados: interfaces (não types genéricos).
+Evite enums — use objetos literais ou uniões de strings.
+
+typescript// ✅ Correto
+type PipelineStage = 'atendimento' | 'negociacao' | 'fechado' | 'perdido';
+
+// ❌ Evitar
+enum PipelineStage { ATENDIMENTO, NEGOCIACAO, FECHADO, PERDIDO }
+
+8. TypeScript
+
+Todo código em TypeScript. Sem any — use unknown ou tipos explícitos.
+Prefira interfaces para props de componentes e modelos de dados.
+Use componentes funcionais com props claramente tipadas.
+
+
+9. UI e Estilização
+
+Shadcn UI (baseado em Radix UI) para todos os componentes de interface.
+Tailwind CSS para layout, espaçamento e estilos utilitários.
+Mobile-first — design responsivo por padrão.
+Suporte a modo escuro via variantes dark: do Tailwind.
+O Kanban deve ser visualmente claro com distinção de cor por estágio.
+
+
+10. Supabase Storage — Contratos
+
+Contratos ficam no bucket contratos do Supabase Storage.
+O path de armazenamento deve seguir o padrão: contratos/{lead_id}/{timestamp}_{nome_arquivo}.
+Acesso ao arquivo deve ser controlado via signed URLs (nunca URLs públicas para documentos de clientes).
+Metadados do contrato (nome, data, URL, lead_id) são registrados na tabela contratos.
+
+
+11. Performance
+
+Minimize useEffect e useState desnecessários.
+Faça lazy loading de componentes não críticos (ex: modais de contrato, relatórios).
+O Kanban deve paginar ou virtualizar quando houver mais de 50 leads por coluna.
+Otimize imagens: formatos modernos (WebP/AVIF), lazy-load, width/height definidos.
+
+
+12. Gerenciamento de Estado
+
+Prefira estado local (useState, useReducer) para a maioria dos casos.
+Para estado global (autenticação, role do usuário), use Context API do React.
+Evite bibliotecas de estado complexas (Redux, Zustand) — o projeto não justifica essa complexidade no momento.
+
+
+13. Linting e Qualidade
+
+ESLint + Prettier + TypeScript em modo strict.
+Valide todas as entradas de formulários com zod.
+O comando pnpm dev deve iniciar sem erros de TypeScript ou linter.
+
+
+14. Segurança
+
+Variáveis de ambiente: Nunca exponha segredos no navegador.
+RLS obrigatório: Todas as tabelas com políticas validando auth.uid(). Consultor só acessa seus próprios leads.
+Auth Guards: Toda lógica sensível (movimentação de estágio, criação de usuário) validada em Edge Function — nunca só no cliente.
+Supabase anon key: Apenas para consultas públicas seguras no client-side.
+Supabase service_role: Exclusivamente em Edge Functions.
+Edge Functions: Valide todas as entradas com zod. Segredos em variáveis de ambiente da função.
+Storage: Contratos acessados apenas via signed URLs. Nunca URLs públicas permanentes.
+Exposição mínima de dados: Retorne apenas os campos necessários — especialmente para o role Consultor.
+Sessão: Use as verificações de sessão do Supabase Auth em todas as rotas protegidas.
+
+
+15. Histórico Imutável de Interações
+
+A tabela lead_interactions registra toda ação sobre um lead: mudança de estágio, anotação, upload de contrato, interação registrada manualmente.
+Nunca permita UPDATE ou DELETE nessa tabela — implemente via RLS policy (USING (false) para update/delete).
+Toda inserção deve incluir: lead_id, user_id, tipo_interacao, descricao, created_at (gerado pelo banco).
+
+
+16. Documentação
+
+Documente decisões importantes de arquitetura em README.md ou docs/.
+Registre os gates de cada estágio do pipeline em docs/pipeline-rules.md
